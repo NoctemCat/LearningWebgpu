@@ -1,0 +1,127 @@
+{
+    "version": 8,
+    "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+    "configurePresets": [
+        {
+            "name": "cache-debug",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            },
+            "environment": {
+                "CMAKE_COLOR_DIAGNOSTICS": "ON"
+            }
+        },
+        {
+            "name": "cache-release",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            },
+            "environment": {
+                "CMAKE_COLOR_DIAGNOSTICS": "ON"
+            }
+        },
+        {
+            "name": "show-windows",
+            "hidden": true,
+            "binaryDir": "build/${presetName}/",
+            "installDir": "install/${presetName}/",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "emscripten-common",
+            "hidden": true,
+            "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+        },
+        {
+            "inherits": "show-windows",
+            "name": "windows-msvc",
+            "generator": "Visual Studio 17 2022"
+        },
+        {
+            "inherits": [
+                "show-windows",
+                "cache-debug"
+            ],
+            "name": "windows-ninja-debug",
+            "generator": "Ninja",
+            "toolchainFile": "Windows.MSVC.toolchain.cmake"
+        },
+        {
+            "inherits": [
+                "show-windows",
+                "emscripten-common",
+                "cache-debug"
+            ],
+            "name": "windows-emscripten-debug",
+            "description": "Sets Emscripten Toolchain",
+            "generator": "MinGW Makefiles"
+        },
+        {
+            "inherits": [
+                "show-windows",
+                "emscripten-common",
+                "cache-release"
+            ],
+            "name": "windows-emscripten-release",
+            "description": "Sets Emscripten Toolchain",
+            "generator": "MinGW Makefiles"
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "show-windows",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "targets": [
+                "App"
+            ]
+        },
+        {
+            "name": "show-linux",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "targets": [
+                "App"
+            ]
+        },
+        {
+            "name": "show-darwin",
+            "displayName": "macOS",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "targets": [
+                "App"
+            ]
+        },
+        {
+            "inherits": "show-windows",
+            "name": "app-msvc-debug",
+            "configurePreset": "windows-msvc",
+            "configuration": "Debug"
+        },
+        {
+            "inherits": "show-windows",
+            "name": "app-msvc-release",
+            "configurePreset": "windows-msvc",
+            "configuration": "Release"
+        }
+    ]
+}

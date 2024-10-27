@@ -1,0 +1,14 @@
+{
+    "hello": "world",
+    "how": 123,
+    "you": [
+        "arr",
+        "values",
+        {
+            "inner": "yes",
+            "also": "inner"
+        },
+        "nothing"
+    ],
+    "other": true
+}
