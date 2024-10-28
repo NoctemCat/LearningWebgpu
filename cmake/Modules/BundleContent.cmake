@@ -24,6 +24,15 @@ include_guard()
 
 cmake_minimum_required(VERSION 3.25...3.30)
 
+if(EXISTS "${CMAKE_SOURCE_DIR}/BundleContentBaseDir.txt")
+    set(BUNDLECONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}" CACHE INTERNAL "")
+    file(READ "${CMAKE_SOURCE_DIR}/BundleContentBaseDir.txt" ModuleDir)
+    set(BUNDLECONTENT_MODULE_DIR "${ModuleDir}" CACHE INTERNAL "")
+
+elseif(NOT DEFINED BUNDLECONTENT_BASE_DIR)
+    set(BUNDLECONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/bundler" CACHE INTERNAL "")
+endif()
+
 if(NOT DEFINED BUNDLECONTENT_MODULE_DIR)
     set(BUNDLECONTENT_MODULE_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "")
 endif()
@@ -31,7 +40,6 @@ endif()
 include(${BUNDLECONTENT_MODULE_DIR}/BundleContent/BundleContent_Utils.cmake)
 
 _set_if_undefined_cache(BUNDLECONTENT_CMAKE_TOOLCHAIN_FILE "${CMAKE_TOOLCHAIN_FILE}" "Copy of the toolchain file location")
-_set_if_undefined_cache(BUNDLECONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/bundler" "")
 _set_if_undefined_cache(BUNDLECONTENT_DEPS_DIR "${BUNDLECONTENT_BASE_DIR}/_bundler_deps" "")
 _set_if_undefined_cache(BUNDLECONTENT_INSTALL_DIR "install" "")
 
@@ -47,3 +55,7 @@ endif()
 file(COPY "${BUNDLECONTENT_MODULE_DIR}/BundleContent/CMakeLists.txt"
     DESTINATION "${BUNDLECONTENT_BASE_DIR}"
 )
+
+if(NOT EXISTS "${BUNDLECONTENT_BASE_DIR}/BundleContentBaseDir.txt")
+    file(WRITE "${BUNDLECONTENT_BASE_DIR}/BundleContentBaseDir.txt" "${BUNDLECONTENT_MODULE_DIR}")
+endif()

@@ -6,8 +6,8 @@ out/*
 build/*
 CMakeUserPresets.json
 
-third_party/*
+third_party
 third_party/dawn
-!third_party/sdl2webgpu/
-!third_party/webgpu-dawn/
+!third_party/sdl2webgpu
+!third_party/webgpu-dawn
 bundler/*

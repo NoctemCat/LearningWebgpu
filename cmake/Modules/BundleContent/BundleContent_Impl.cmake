@@ -112,8 +112,8 @@ function(BundleContent_Declare TargetName)
         string(APPEND QuotedArgs " [===[${TargetDirectory}]===]")
 
         if(NOT "${CacheVar.forwarded_args}" STREQUAL "${QuotedArgs}")
-            message(STATUS "Bundler: Forwarding args to \"FetchContent_Declare\"")
-            message(STATUS "Bundler: ${QuotedArgs}")
+            message(STATUS "Bundler: Forwarding args to \"FetchContent\"")
+            message(STATUS "Bundler:${QuotedArgs}")
             cmake_language(EVAL CODE "
                 include(FetchContent)
                 FetchContent_Declare(${TargetName} ${QuotedArgs})
@@ -453,8 +453,6 @@ function(_BundleContent_DeleteBuildFiles EscTargetName CacheVar)
             file(REMOVE_RECURSE ${Dir})
         endif()
     endforeach()
-
-    _delete_empty_directories_recurse("${TargetDir}")
 
     message(STATUS "Bundler: Build files deleted")
 endfunction()

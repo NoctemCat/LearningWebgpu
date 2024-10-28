@@ -21,11 +21,6 @@ if(EMSCRIPTEN)
 # )
 # endif()
 else(EMSCRIPTEN)
-    # if(IS_DIRECTORY "D:/Projects/WebGPU/minimal/bundler/webgpu-bundle/install/Visual_Studio_17_2022_/include/dawn-src/docs")
-    # message(NOTICE "Yep is dir")
-    # endif()
-
-    # message(FATAL_ERROR "ss")
     BundleContent_Declare(webgpu-bundle BUNDLE_TARGET webgpu
         SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/webgpu-dawn"
 
