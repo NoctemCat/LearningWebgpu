@@ -212,7 +212,7 @@ bool Application::initialize() {
 
     surface.configure(WGPUSurfaceConfiguration{
         .device = device,
-        .format = TextureFormat::RGBA8UnormSrgb,
+        .format = TextureFormat::BGRA8UnormSrgb,
         .usage = TextureUsage::TextureBinding,
         .alphaMode = CompositeAlphaMode::Auto,
         .width = 640,
@@ -602,7 +602,7 @@ void Application::playingWithBuffers() {
         .callback =
             [](WGPUMapAsyncStatus status, const char *message, void *pUserData1, void *pUserData2) {
                 println("Buffer 2 mapped with status {}{}", status, format_if(" ({})", message));
-                if (status != BufferMapAsyncStatus::Success)
+                if (status != MapAsyncStatus::Success)
                     return;
 
                 Buffer buffer = reinterpret_cast<WGPUBuffer>(pUserData1);

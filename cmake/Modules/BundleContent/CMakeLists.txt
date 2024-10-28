@@ -159,6 +159,26 @@ while(DirsCombined)
     # message(NOTICE "RelDir: ${RelativePath}, Destination: ${InstallDestination}")
 endwhile()
 
+function(_ReplaceWithConfig Glue InputString OutVar)
+    list(GET CONFIGURATIONS -1 LastConfig)
+    set(Result "")
+    foreach(Config IN LISTS CONFIGURATIONS)
+        string(TOUPPER "${Config}" PossibleConfigUpper)
+        string(TOLOWER "${Config}" PossibleConfigLower)
+
+        set(LocalString "${InputString}")
+
+        string(REPLACE "%LOWER%" "${PossibleConfigLower}" LocalString "${LocalString}")
+        string(REPLACE "%UPPER%" "${PossibleConfigUpper}" LocalString "${LocalString}")
+
+        string(APPEND Result "${LocalString}")
+        if(NOT "${Config}" STREQUAL "${LastConfig}")
+            string(APPEND Result "${Glue}")
+        endif()
+    endforeach()
+    set(${OutVar} "${Result}" PARENT_SCOPE)
+endfunction()
+
 # message(FATAL_ERROR "err")
 set(CopyInstallDeps ${InstallDepsFiles})
 list(TRANSFORM CopyInstallDeps PREPEND ".*")
@@ -169,22 +189,33 @@ foreach(Library IN LISTS SharedLibs)
     set_target_properties(${Library} PROPERTIES
         ${ConfigUpper}_POSTFIX "_${ConfigLower}"
     )
-    install(FILES "$<TARGET_PDB_FILE:${Library}>"
-        DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL
-    )
+
+    set(DepsDirectories "")
+
+    if(WIN32)
+        install(FILES "$<TARGET_PDB_FILE:${Library}>"
+            DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL
+        )
+
+        set(DepsDirectories "DIRECTORIES $<TARGET_FILE_DIR:${Library}>")
+
+        foreach(Dependency IN LISTS ${Library}_Deps)
+            string(APPEND DepsDirectories " $<TARGET_FILE_DIR:${Dependency}>")
+        endforeach()
+    endif()
+
     install(TARGETS ${Library} RUNTIME_DEPENDENCY_SET ${Library}_DepsSet)
-
-    set(DepsDirectories "$<TARGET_FILE_DIR:${Library}>")
-
-    foreach(Dependency IN LISTS ${Library}_Deps)
-        list(APPEND DepsDirectories "$<TARGET_FILE_DIR:${Dependency}>")
-    endforeach()
 
     # TODO: Figure out a way to gather directories ??$<TARGET_FILE_DIR:target>
     install(RUNTIME_DEPENDENCY_SET ${Library}_DepsSet
-        PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-" ${CopyInstallDeps}
-        POST_EXCLUDE_REGEXES ".*system32/.*\\.dll"
-        DIRECTORIES ${DepsDirectories}
+        PRE_EXCLUDE_REGEXES 
+            [=[api-ms-]=] # VC Redistibutable DLLs
+            [=[ext-ms-]=] # Windows extension DLLs
+            ${CopyInstallDeps}
+        POST_EXCLUDE_REGEXES 
+            [=[.*system32\/.*\.dll]=] # Windows system DLLs
+            [=[^\/(lib|usr\/lib|usr\/local\/lib)]=] # Unix system libraries
+        ${DepsDirectories}
     )
 
     if(WIN32)
@@ -199,40 +230,30 @@ foreach(Library IN LISTS SharedLibs)
         set(LibName "${Library}")
     endif()
 
-    set(SharedLibs "")
-    set(ImpLibs "")
+    set(LibraryFilenameGenex "DEPS_${Library}_LIBRARY_FILENAME_$<UPPER_CASE:$<CONFIG>>")
+    set(LibraryGenex "DEPS_${Library}_LIBRARY_$<UPPER_CASE:$<CONFIG>>")
+    set(ImplibFilenameGenex "DEPS_${Library}_IMPLIB_FILENAME_$<UPPER_CASE:$<CONFIG>>")
+    set(ImplibGenex "DEPS_${Library}_IMPLIB_$<UPPER_CASE:$<CONFIG>>")
+
+    file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/Shared${Library}Library_$<LOWER_CASE:$<CONFIG>>.cmake CONTENT "
+set_and_check(${LibraryFilenameGenex} \"$<TARGET_FILE_NAME:${Library}>\")
+set_and_check(${LibraryGenex} \"\$\{PACKAGE_PREFIX_DIR\}/${SharedDestination}/$<TARGET_FILE_NAME:${Library}>\") $<$<BOOL:${WIN32}>: 
+set_and_check(${ImplibFilenameGenex} \"${CMAKE_IMPORT_LIBRARY_PREFIX}${LibName}_$<LOWER_CASE:$<CONFIG>>${CMAKE_IMPORT_LIBRARY_SUFFIX}\") 
+set_and_check(${ImplibGenex} \"\$\{PACKAGE_PREFIX_DIR\}/${CMAKE_INSTALL_LIBDIR}/\$\{${ImplibFilenameGenex}\}\") 
+>")
+
     set(SharedLibsProp "")
     set(ImpLibsProp "")
     set(SharedNames "")
 
-    # string(APPEND SharedLibs "\nset_and_check(DEPS_${Library}_LIBRARY \"\$\{PACKAGE_PREFIX_DIR\}/${SharedDestination}/")
-    # string(APPEND SharedLibs "$<TARGET_FILE_PREFIX:${Library}>${LibName}_release$<TARGET_FILE_SUFFIX:${Library}>")
-    # string(APPEND SharedLibs "\")")
-
-    # if(WIN32)
-    # string(APPEND ImpLibs "\nset_and_check(DEPS_${Library}_IMPLIB \"\$\{PACKAGE_PREFIX_DIR\}/${CMAKE_INSTALL_LIBDIR}/")
-    # string(APPEND ImpLibs "${CMAKE_IMPORT_LIBRARY_PREFIX}${LibName}_release${CMAKE_IMPORT_LIBRARY_SUFFIX}")
-    # string(APPEND ImpLibs "\")")
-
-    # string(APPEND AllImpLibs "\n    IMPORTED_IMPLIB \"\$\{DEPS_${Library}_IMPLIB\}\" ")
-    # endif()
-    foreach(Config IN LISTS CONFIGURATIONS)
-        string(TOUPPER "${Config}" PossibleConfigUpper)
-        string(TOLOWER "${Config}" PossibleConfigLower)
-        set(SharedFileName "$<TARGET_FILE_PREFIX:${Library}>${LibName}_${PossibleConfigLower}$<TARGET_FILE_SUFFIX:${Library}>")
-        string(APPEND SharedLibs "\nset_and_check(DEPS_${Library}_LIBRARY_${PossibleConfigUpper} \"\$\{PACKAGE_PREFIX_DIR\}/${SharedDestination}/${SharedFileName}\")")
-        string(APPEND SharedLibsProp "\n    IMPORTED_LOCATION_${PossibleConfigUpper} \"\$\{DEPS_${Library}_LIBRARY_${PossibleConfigUpper}\}\" ")
-
-        if(WIN32)
-            set(SharedImpFileName "${CMAKE_IMPORT_LIBRARY_PREFIX}${LibName}_${PossibleConfigLower}${CMAKE_IMPORT_LIBRARY_SUFFIX}")
-            string(APPEND ImpLibs "\nset_and_check(DEPS_${Library}_IMPLIB_${PossibleConfigUpper} \"\$\{PACKAGE_PREFIX_DIR\}/${CMAKE_INSTALL_LIBDIR}/${SharedImpFileName}\")")
-            string(APPEND ImpLibsProp "\n    IMPORTED_IMPLIB_${PossibleConfigUpper} \"\$\{DEPS_${Library}_IMPLIB_${PossibleConfigUpper}\}\" ")
-
-            list(APPEND SharedNames "${SharedImpFileName}")
-        endif()
-
-        list(APPEND SharedNames "${SharedFileName}")
-    endforeach()
+    _ReplaceWithConfig("\n    " "IMPORTED_LOCATION_%UPPER% \"\$\{DEPS_${Library}_LIBRARY_%UPPER%\}\" " SharedLibsProp)
+    _ReplaceWithConfig(";" "\$\{DEPS_${Library}_LIBRARY_FILENAME_%UPPER%\}" SharedNames)
+    if(WIN32)
+        _ReplaceWithConfig("\n    " "IMPORTED_IMPLIB_%UPPER% \"\$\{DEPS_${Library}_IMPLIB_%UPPER%\}\" " ImpLibsProp)
+        _ReplaceWithConfig(";" "\$\{DEPS_${Library}_IMPLIB_FILENAME_%UPPER%\}" ImplibNames)
+        string(PREPEND ImpLibsProp "\n")
+        list(APPEND SharedNames ${ImplibNames})
+    endif()
 
     extract_properties_genex("${Library}" SharedProps PROPERTIES
         INTERFACE_COMPILE_DEFINITIONS
@@ -258,19 +279,36 @@ foreach(Library IN LISTS SharedLibs)
         set(LibraryDeps "\n    INTERFACE_LINK_LIBRARIES \"${CopyLinkDeps}\"")
     endif()
 
-    get_target_property(IsNoSoName ${Library} NO_SONAME)
+    # include(CMakePrintHelpers)
+    # cmake_print_properties(TARGETS ${Library} 
+    #     PROPERTIES 
+    #         NO_SONAME
+    #         SOVERSION
+    #         VERSION
+    #         OUTPUT_NAME
+    # )
 
-    # IMPORTED_SONAME libname.soversion???
-    # Version???
-    # $<TARGET_SONAME_FILE_NAME:tgt>?
-    # OUTPUT_NAME is SONAME in SDL2???
-    # ?? IMPORTED_NO_SONAME ??
-    # IMPORTED_LOCATION \"\$\{DEPS_${Library}_LIBRARY\}\" ${AllSharedLibs} ${AllImpLibs} ${SharedProps}
-    set(LibInstall "${LibraryDepsInclude} ${SharedLibs} ${ImpLibs}
+    set(SoNameProps "")
+    # Have no idea if it is the same for mac, but oh well
+    if(NOT WIN32)
+        get_target_property(IsNoSoName ${Library} NO_SONAME)
+        if(${IsNoSoName})
+            set(SoNameProps "\n    IMPORTED_NO_SONAME TRUE")
+        else()
+            get_target_property(LibSoVersion ${Library} SOVERSION)
+            # IMPORTED_SONAME prefix_libname_postfix.suffix.soversion
+            set(SoNameTemplate "IMPORTED_SONAME_%UPPER% \"$<TARGET_FILE_PREFIX:${Library}>${LibName}_%LOWER%$<TARGET_FILE_SUFFIX:${Library}>.${LibSoVersion}\"")
+            _ReplaceWithConfig("\n    " "${SoNameTemplate}" SoNameProps) 
+            string(PREPEND SoNameProps "\n    ")
+        endif()
+    endif()
+
+    set(LibInstall "${LibraryDepsInclude} %PLACEHOLDER%
 
 add_library(DEPS_${Library} SHARED IMPORTED)
 
-set_target_properties(DEPS_${Library} PROPERTIES ${SharedLibsProp} ${ImpLibsProp} ${SharedProps} 
+set_target_properties(DEPS_${Library} PROPERTIES 
+    ${SharedLibsProp} ${ImpLibsProp} ${SoNameProps} ${SharedProps} 
     IMPORTED_CONFIGURATIONS \"${ConfigsUpper}\" ${LibraryDeps}
     FOLDER \"${EXPORT_NAME}\" 
 )
@@ -279,10 +317,31 @@ set(DEPS_${Library}_FILENAMES \"${SharedNames}\")
 list(APPEND DEPS_${Library}_FILENAMES ${LibraryDepsNames})
 ")
 
-    file(GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/Shared${Library}Target.cmake CONTENT "${LibInstall}")
+    file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/Shared${Library}TargetBody.cmake CONTENT "${LibInstall}")
 
-    if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/Shared${Library}Target.cmake)
-        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Shared${Library}Target.cmake"
+    set(EveryConfigPresent TRUE)
+    foreach(Config IN LISTS CONFIGURATIONS)
+        string(TOLOWER "${Config}" PossibleConfigLower)
+
+        if(NOT EXISTS ${CMAKE_BINARY_DIR}/../${PossibleConfigLower}/Shared${Library}Library_${PossibleConfigLower}.cmake)
+            set(EveryConfigPresent FALSE)
+        endif()
+    endforeach()
+
+    if(${EveryConfigPresent})
+        file(READ ${CMAKE_BINARY_DIR}/Shared${Library}TargetBody.cmake CurrentBody)
+
+        set(Accumulator "")
+        foreach(Config IN LISTS CONFIGURATIONS)
+            string(TOLOWER "${Config}" PossibleConfigLower)
+            file(READ ${CMAKE_BINARY_DIR}/../${PossibleConfigLower}/Shared${Library}Library_${PossibleConfigLower}.cmake CurrentPart)
+
+            string(APPEND Accumulator "${CurrentPart}")
+        endforeach()
+        string(REPLACE "%PLACEHOLDER%" "${Accumulator}" Combined "${CurrentBody}")
+
+        file(WRITE ${CMAKE_BINARY_DIR}/Shared${Library}Target.cmake "${Combined}")
+        install(FILES "${CMAKE_BINARY_DIR}/Shared${Library}Target.cmake"
             DESTINATION cmake
             CONFIGURATIONS Package
         )
@@ -338,22 +397,10 @@ endif()
 
 string(SUBSTRING "${INSTALL_INCLUDE_DIRS}" 22 -1 INSTALL_INCLUDE_DIRS)
 
-set(AllLibraries "")
-set(AllLocations "")
-set(TargetNames "")
-
-# string(APPEND AllLibraries "\nset_and_check(${EXPORT_NAME}_LIBRARY \"\$\{PACKAGE_PREFIX_DIR\}/lib/")
-# string(APPEND AllLibraries "$<TARGET_FILE_PREFIX:${TargetBundleName}>${TargetBundleName}_release$<TARGET_FILE_SUFFIX:${TargetBundleName}>")
-# string(APPEND AllLibraries "\")")
-foreach(PossibleConfig IN LISTS CONFIGURATIONS)
-    string(TOUPPER "${PossibleConfig}" PossibleConfigUpper)
-    string(TOLOWER "${PossibleConfig}" PossibleConfigLower)
-
-    set(TargetFileName "$<TARGET_FILE_PREFIX:${TargetBundleName}>${TargetBundleName}_${PossibleConfigLower}$<TARGET_FILE_SUFFIX:${TargetBundleName}>")
-    string(APPEND AllLibraries "\nset_and_check(${EXPORT_NAME}_LIBRARY_${PossibleConfigUpper} \"\$\{PACKAGE_PREFIX_DIR\}/${CMAKE_INSTALL_LIBDIR}/${TargetFileName}\")")
-    string(APPEND AllLocations "\n    IMPORTED_LOCATION_${PossibleConfigUpper} \"\$\{${EXPORT_NAME}_LIBRARY_${PossibleConfigUpper}\}\"")
-    list(APPEND TargetNames "${TargetFileName}")
-endforeach()
+set(TargetFileNameTemplate "$<TARGET_FILE_PREFIX:${TargetBundleName}>${TargetBundleName}_%LOWER%$<TARGET_FILE_SUFFIX:${TargetBundleName}>")
+_ReplaceWithConfig("\n" "set_and_check(${EXPORT_NAME}_LIBRARY_%LOWER% \"\$\{PACKAGE_PREFIX_DIR\}/${CMAKE_INSTALL_LIBDIR}/${TargetFileNameTemplate}\")" AllLibraries)
+_ReplaceWithConfig("\n    " "IMPORTED_LOCATION_%UPPER% \"\$\{${EXPORT_NAME}_LIBRARY_%UPPER%\}\"" AllLocations)
+_ReplaceWithConfig(";" "\$\{${TargetFileNameTemplate}\}" TargetNames)
 
 extract_properties_genex("${TARGET_TO_BUNDLE}" TargetProps PROPERTIES
     INTERFACE_COMPILE_DEFINITIONS
@@ -368,18 +415,20 @@ if(NOT "${TARGET_TO_BUNDLE}" STREQUAL "${EXPORT_NAME}")
     set(ExportAliasString "\nadd_library(${TARGET_TO_BUNDLE} ALIAS ${EXPORT_NAME})")
 endif()
 
-# TODO: Think about the benefits of allowed genex inside INCLUDE_DIR,
+# TODO: Think about the benefits of allowing genex inside INCLUDE_DIR,
 # and if it needs to be removed
 # IMPORTED_LOCATION \"\$\{${EXPORT_NAME}_LIBRARY\}\"
 file(GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/BundleConfig.cmake.in CONTENT
     "@PACKAGE_INIT@ 
 ${TargetDepsInclude}
-set(${EXPORT_NAME}_INCLUDE_DIRS \"@PACKAGE_INSTALL_INCLUDE_DIRS@\") ${AllLibraries}
+set(${EXPORT_NAME}_INCLUDE_DIRS \"@PACKAGE_INSTALL_INCLUDE_DIRS@\") 
+${AllLibraries}
 
 set(${EXPORT_NAME}_FOUND TRUE)
 add_library(${EXPORT_NAME} STATIC IMPORTED)
 
-set_target_properties(${EXPORT_NAME} PROPERTIES ${AllLocations} ${TargetProps}
+set_target_properties(${EXPORT_NAME} PROPERTIES 
+    ${AllLocations} ${TargetProps}
     INTERFACE_INCLUDE_DIRECTORIES \"\$\{${EXPORT_NAME}_INCLUDE_DIRS\}\" 
     IMPORTED_CONFIGURATIONS \"${ConfigsUpper}\" ${TargetDeps}
     FOLDER \"${EXPORT_NAME}\" 

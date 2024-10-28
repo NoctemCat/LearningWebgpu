@@ -189,7 +189,7 @@ function(execute_sequential)
             message(STATUS "[ex_se] Executing command: ${Cmd} ${AccPrint}")
         endif()
 
-        cmake_language(EVAL CODE "execute_process(COMMAND \"${Cmd}\" ${Args} ${ForwardArgs})")
+        cmake_language(EVAL CODE "execute_process(COMMAND ${Cmd} ${Args} ${ForwardArgs})")
     endfunction()
 
     set(Cmd "")

@@ -279,14 +279,15 @@ struct TypeFormatter<WGPUBufferMapAsyncStatus> {
     static std::string toString(const WGPUBufferMapAsyncStatus &value) {
         switch (value) {
         case WGPUBufferMapAsyncStatus_Success: return "Success";
-        case WGPUBufferMapAsyncStatus_ValidationError: return "onError";
+        case WGPUBufferMapAsyncStatus_InstanceDropped: return "InstanceDropped";
+        case WGPUBufferMapAsyncStatus_ValidationError: return "ValidationError";
         case WGPUBufferMapAsyncStatus_Unknown: return "Unknown";
-        case WGPUBufferMapAsyncStatus_DeviceLost: return "iceLost";
-        case WGPUBufferMapAsyncStatus_DestroyedBeforeCallback: return "allback";
-        case WGPUBufferMapAsyncStatus_UnmappedBeforeCallback: return "allback";
-        case WGPUBufferMapAsyncStatus_MappingAlreadyPending: return "Pending";
-        case WGPUBufferMapAsyncStatus_OffsetOutOfRange: return "OfRange";
-        case WGPUBufferMapAsyncStatus_SizeOutOfRange: return "OfRange";
+        case WGPUBufferMapAsyncStatus_DeviceLost: return "DeviceLost";
+        case WGPUBufferMapAsyncStatus_DestroyedBeforeCallback: return "DestroyedBeforeCallback";
+        case WGPUBufferMapAsyncStatus_UnmappedBeforeCallback: return "UnmappedBeforeCallback";
+        case WGPUBufferMapAsyncStatus_MappingAlreadyPending: return "MappingAlreadyPending:";
+        case WGPUBufferMapAsyncStatus_OffsetOutOfRange: return "OffsetOutOfRange";
+        case WGPUBufferMapAsyncStatus_SizeOutOfRange: return "SizeOutOfRange:";
         case WGPUBufferMapAsyncStatus_Force32: return "Force32";
         }
         return std::format("WGPUQueueWorkDoneStatus: {:#010X}",

@@ -81,12 +81,12 @@ if(EMSCRIPTEN)
         -g
         -gseparate-dwarf=out/temp.debug.wasm
     )
-else(EMSCRIPTEN)
+elseif(WIN32)
     add_custom_command(TARGET App POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:App> $<TARGET_FILE_DIR:App>
         COMMAND_EXPAND_LISTS
     )
-endif(EMSCRIPTEN)
+endif()
 
 set_target_properties(App PROPERTIES ${SHARED_PROPERTIES})
 target_link_libraries(App PRIVATE ${EXE_LINK_LIBRARIES})

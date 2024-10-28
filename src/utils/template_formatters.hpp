@@ -19,7 +19,7 @@ template <> struct TypeFormatter<bool> {};
 template <> struct TypeFormatter<float> {};
 template <> struct TypeFormatter<double> {};
 template <> struct TypeFormatter<long double> {};
-template <> struct TypeFormatter<nullptr_t> {};
+template <> struct TypeFormatter<std::nullptr_t> {};
 template <> struct TypeFormatter<void *> {};
 template <> struct TypeFormatter<const void *> {};
 template <> struct TypeFormatter<unsigned short> {};

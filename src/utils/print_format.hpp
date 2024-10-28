@@ -25,7 +25,7 @@ template <class... Args>
 }
 template <class... Args>
     requires std::is_convertible_v<std::tuple_element_t<0, std::tuple<Args...>>, bool> ||
-             std::is_convertible_v<std::tuple_element_t<0, std::tuple<Args...>>, nullptr_t>
+             std::is_convertible_v<std::tuple_element_t<0, std::tuple<Args...>>, std::nullptr_t>
 [[nodiscard]] std::string format_if_else(const std::format_string<Args...> fmt, std::string_view onFalse,
                                          Args &&...args) {
 
