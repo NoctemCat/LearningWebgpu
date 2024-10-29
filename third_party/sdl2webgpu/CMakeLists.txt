@@ -7,15 +7,6 @@ add_library(sdl2webgpu STATIC sdl2webgpu.c)
 target_include_directories(sdl2webgpu PUBLIC .)
 target_link_libraries(sdl2webgpu PUBLIC SDL2-aware webgpu)
 
-# webgpu
-# print_target_properties(webgpu)
-include(CMakePrintHelpers)
-cmake_print_properties(TARGETS webgpu 
-    PROPERTIES
-        IMPORTED_LOCATION
-        IMPORTED_LOCATION_DEBUG
-        IMPORTED_LOCATION_RELEASE
-)
 # target_compile_definitions(sdl2webgpu PUBLIC SDL_MAIN_HANDLED)
 if(EMSCRIPTEN)
     target_compile_options(sdl2webgpu PRIVATE --use-port=sdl2)

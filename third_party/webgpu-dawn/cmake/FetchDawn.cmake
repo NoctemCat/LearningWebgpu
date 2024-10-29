@@ -10,7 +10,7 @@ if(TRUE)
 	set(Dir ${BUNDLECONTENT_DEPS_DIR}/dawn-src)
 	
 	if(WIN32)
-		set(Shell "powershell iex")
+		set(Shell "cmd /C")
 	else()
 		set(Shell "zsh -c")
 	endif()
@@ -21,8 +21,8 @@ if(TRUE)
 		# GIT_PROGRESS TRUE
 		# GIT_SHALLOW ON
 		DOWNLOAD_COMMAND
-		# ${Shell}
-		git -C ${Dir} init && git -C ${Dir} fetch --depth=1 https://dawn.googlesource.com/dawn chromium/6536 && git -C ${Dir} reset --hard FETCH_HEAD
+		${Shell}
+		"git -C ${Dir} init && git -C ${Dir} fetch --depth=1 https://dawn.googlesource.com/dawn chromium/6536 && git -C ${Dir} reset --hard FETCH_HEAD"
 		# cd ${BUNDLECONTENT_DEPS_DIR}/dawn-src &&
 		# git init &&
 		# git fetch --depth=1 https://dawn.googlesource.com/dawn chromium/6536 &&

@@ -262,7 +262,6 @@ bool Application::initialize() {
     initializeBuffers();
 
     // playingWithBuffers();
-    print("Hello");
     return true;
 }
 

@@ -26,7 +26,6 @@ Set(FETCHCONTENT_QUIET FALSE)
 include(BundleContent)
 
 include(cmake_utils/execute_sequential.cmake)
-
 # include(cmake_utils/bundle_static_library.cmake)
 include(cmake_utils/print_target_properties.cmake)
 include(cmake_utils/detect_compiler.cmake)
