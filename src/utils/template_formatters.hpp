@@ -33,6 +33,7 @@ template <> struct TypeFormatter<std::string_view> {};
 template <> struct TypeFormatter<std::wstring_view> {};
 template <> struct TypeFormatter<std::string> {};
 template <> struct TypeFormatter<std::wstring> {};
+
 // clang-format on
 } // namespace ninelives
 
@@ -42,7 +43,9 @@ concept ImplementedTypeFormatter = requires(const T &value) {
 };
 template <typename T>
 concept ImplementedTypeFormatterComplex = requires(const T &value, std::format_context &ctx_) {
-    { ninelives::TypeFormatter<T>::format(value, ctx_, std::string_view{}) } -> std::same_as<decltype(ctx_.out())>;
+    {
+        ninelives::TypeFormatter<T>::format(value, ctx_, std::string_view{})
+    } -> std::same_as<decltype(ctx_.out())>;
 };
 
 template <typename T>
@@ -51,12 +54,14 @@ template <typename T>
 concept NotImplementedTypeFormatterCustom = not ImplementedTypeFormatterComplex<T>;
 
 template <typename T>
-concept IsSimpleTypeFormatter = ImplementedTypeFormatter<T> and NotImplementedTypeFormatterCustom<T>;
+concept IsSimpleTypeFormatter =
+    ImplementedTypeFormatter<T> and NotImplementedTypeFormatterCustom<T>;
 template <typename T>
 concept IsComplexTypeFormatter = not IsSimpleTypeFormatter<T>;
 
 template <typename T>
-concept NotImplementedFormatters = NotImplementedTypeFormatter<T> and NotImplementedTypeFormatterCustom<T>;
+concept NotImplementedFormatters =
+    NotImplementedTypeFormatter<T> and NotImplementedTypeFormatterCustom<T>;
 template <typename T>
 concept ImplementedFormatters = ImplementedTypeFormatter<T> or ImplementedTypeFormatterComplex<T>;
 
@@ -84,7 +89,6 @@ struct formatter<T> : formatter<string> {
 
 template <typename T>
     requires ImplementedTypeFormatterComplex<T>
-
 struct formatter<T> {
     string_view formatString{""};
 
@@ -109,10 +113,11 @@ struct formatter<T> {
 template <typename T>
     requires is_enum_v<T> and NotImplementedFormatters<T>
 struct formatter<T> : formatter<underlying_type_t<T>> {
+    using base_type = underlying_type_t<T>;
 
     template <class FormatContext>
     constexpr auto format(const T &value, FormatContext &ctx) const {
-        return formatter<underlying_type_t<T>>::format(static_cast<underlying_type_t<T>>(value), ctx);
+        return formatter<base_type>::format(static_cast<base_type>(value), ctx);
     }
 };
 

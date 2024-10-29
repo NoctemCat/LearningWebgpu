@@ -40,7 +40,10 @@ void inspectDevice(wgpu::Device device) {
     }
 }
 
-bool loadGeometry(const std::filesystem::path &path, std::vector<float> &pointData, std::vector<uint16_t> &indexData) {
+bool loadGeometry(
+    const std::filesystem::path &path, std::vector<float> &pointData,
+    std::vector<uint16_t> &indexData
+) {
     std::ifstream file(path);
     if (!file.is_open()) {
         return false;

@@ -24,6 +24,7 @@ public:
     bool initialize();
     void terminate();
     void mainLoop();
+
     bool isRunning() { return !shouldClose; }
 
 private:

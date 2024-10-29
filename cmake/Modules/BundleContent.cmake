@@ -52,6 +52,7 @@ _set_if_undefined_cache(BUNDLECONTENT_BUILD_DIR "${CMAKE_BINARY_DIR}" "")
 _set_if_undefined_cache(BUNDLECONTENT_KEY_SEPARATOR "_" "")
 _set_if_undefined_cache(BUNDLECONTENT_SPACE_REPLACEMENT "_" "")
 _set_if_undefined_cache(BUNDLECONTENT_DEFAULT_MAPPING "MinSizeRel;RelWithDebInfo;Release;Debug" "")
+_set_if_undefined_cache(BUNDLECONTENT_BUILD_MISSING "Release;Debug" "")
 include(${BUNDLECONTENT_MODULE_DIR}/BundleContent/BundleContent_Impl.cmake)
 
 if(NOT EXISTS "${BUNDLECONTENT_BASE_DIR}/CMakeLists.txt")

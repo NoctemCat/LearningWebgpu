@@ -212,7 +212,7 @@ function(_exe_seq_launch_process Cmd Args ForwardArgs Quiet)
         message(STATUS "[ex_se] Executing command: ${Cmd} ${AccPrint}")
     endif()
 
-    cmake_language(EVAL CODE "execute_process(COMMAND ${Cmd} ${Args} ${ForwardArgs})")
+    cmake_language(EVAL CODE "execute_process(COMMAND \"${Cmd}\" ${Args} ${ForwardArgs})")
 endfunction()
 
 function(_list_to_json_string InList OutString)

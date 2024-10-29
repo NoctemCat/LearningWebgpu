@@ -9,6 +9,7 @@ include(${BUNDLECONTENT_MODULE_DIR}/BundleContent/JC.cmake)
 # string(JSON outLen MEMBER "${out}" 0)
 # unset(outLen)
 # get_cmake_property(vars VARIABLES)
+set(BUNDLECONTENT_COMMON_ARGS "_bc_common")
 function(_BundleContent_CheckBuildComponents GeneratorVar ToolchainVar)
     if("${${GeneratorVar}}" STREQUAL "" AND DEFINED CMAKE_GENERATOR)
         set(${GeneratorVar} "${CMAKE_GENERATOR}" PARENT_SCOPE)
@@ -45,14 +46,14 @@ function(_BundleContent_ParseArguments Args OutQuotedArgs OutBuildConfigurations
 
         if("${Arg}" MATCHES "CMAKE_ARGS_?(.*)")
             if("${CMAKE_MATCH_1}" STREQUAL "")
-                set(CurrentConfig "Build_common")
+                set(CurrentConfig ${BUNDLECONTENT_COMMON_ARGS})
             else()
                 string(TOLOWER "${CMAKE_MATCH_1}" ConfigLower)
-                set(CurrentConfig "Build_${ConfigLower}")
+                set(CurrentConfig "${ConfigLower}")
                 list(APPEND BuildConfigurations "${ConfigLower}")
             endif()
         elseif(NOT "${CurrentConfig}" STREQUAL "")
-            list(APPEND ${CurrentConfig}_Args "${Arg}")
+            list(APPEND Build_${CurrentConfig}_Args "${Arg}")
             list(APPEND AllCMakeArgs "${Arg}")
         else()
             set(CurrentConfig "")
@@ -72,9 +73,10 @@ function(_BundleContent_ParseArguments Args OutQuotedArgs OutBuildConfigurations
     set(${OutBuildConfigurations} "${BuildConfigurations}" PARENT_SCOPE)
 
     set(IterConfigs "")
-    list(APPEND IterConfigs "common" ${BuildConfigurations})
+    list(APPEND IterConfigs ${BUNDLECONTENT_COMMON_ARGS} ${BuildConfigurations})
 
     foreach(Config IN LISTS IterConfigs)
+        list(REMOVE_DUPLICATES Build_${Config}_Args)
         set(Build_${Config}_Args "${Build_${Config}_Args}" PARENT_SCOPE)
     endforeach()
 endfunction()
@@ -147,8 +149,9 @@ function(BundleContent_Declare TargetName)
         string(TOLOWER "${ConfigString}" ConfigStringLower)
         set(${ConfigStringLower}_MappedName "${ConfigString}")
 
-        if(NOT "${Build_${ConfigStringLower}}" STREQUAL "ON")
+        if(NOT ${Build_${ConfigStringLower}})
             list(APPEND BuildConfigurations "${ConfigString}")
+            set(Build_${ConfigStringLower} ON)
         endif()
     endforeach()
 
@@ -157,24 +160,27 @@ function(BundleContent_Declare TargetName)
         _set_if_undefined(${ConfigStringLower}_MappedName "${ConfigString}")
     endforeach()
 
-    if(NOT "${Build_release}" STREQUAL "ON")
-        list(APPEND BuildConfigurations "Release")
-    endif()
+    foreach(ConfigString IN LISTS BUNDLECONTENT_BUILD_MISSING)
+        string(TOLOWER "${ConfigString}" ConfigStringLower)
 
-    if(NOT "${Build_debug}" STREQUAL "ON")
-        list(APPEND BuildConfigurations "Debug")
-    endif()
+        if(NOT ${Build_${ConfigStringLower}})
+            list(APPEND BuildConfigurations "${ConfigString}")
+            set(Build_${ConfigStringLower} ON)
+        endif()
+    endforeach()
 
     foreach(ConfigString IN LISTS BuildConfigurations)
         string(TOLOWER "${ConfigString}" ConfigStringLower)
-        set(ConfigArgs "")
-        list(APPEND ConfigArgs ${Build_common_Args} ${Build_${ConfigStringLower}_Args})
-        list(REMOVE_DUPLICATES ConfigArgs)
+        set(ConfigArgs ${Build_${ConfigStringLower}_Args})
         _list_to_json_string("${ConfigArgs}" ConfigArgs)
 
         _BundleContent_SaveConfiguration(CacheVar "${${ConfigStringLower}_MappedName}" "${ConfigArgs}")
     endforeach()
 
+    set(CommonArgs ${Build_${BUNDLECONTENT_COMMON_ARGS}_Args})
+    _list_to_json_string("${CommonArgs}" CommonArgs)
+    
+    _BundleContent_SetIfDifferent(CacheVar common_args "${CommonArgs}")
     _BundleContent_SetIfDifferent(CacheVar target_directory "${TargetDirectory}")
     _BundleContent_SetIfDifferent(CacheVar generator "${Generator}")
     _BundleContent_SetIfDifferent(CacheVar toolchain "${Toolchain}")
@@ -265,6 +271,7 @@ function(_BundleContent_GetDefaultCache OutVar)
         needs_rebuild TRUE
         build_configurations ""
         forwarded_args ""
+        common_args ""
         target_directory ""
         generator ""
         toolchain ""
@@ -471,8 +478,12 @@ function(_BundleContent_DeleteBuildFiles EscTargetName CacheVar)
 endfunction()
 
 function(_BundleContent_GetArgs CacheVar Config OutList)
-    set(Args "${${CacheVar}.build_configurations.${Config}.args}")
+    set(Args "${${CacheVar}.common_args}")
+    set(BuildArgs "${${CacheVar}.build_configurations.${Config}.args}")
     _json_string_to_list("${Args}" Args)
+    _json_string_to_list("${BuildArgs}" BuildArgs)
+    list(APPEND Args ${BuildArgs})
+    list(REMOVE_DUPLICATES Args)
 
     if(NOT "${Args}" MATCHES "CMAKE_BUILD_TYPE")
         list(PREPEND Args "-DCMAKE_BUILD_TYPE=${Config}")
@@ -565,12 +576,14 @@ function(_BundleContent_ForwardGetArgs TargetName OutTargetDirectory OutVarPair 
         endif()
     endforeach()
 
-    if("${CurrentConfig}" STREQUAL "")
-        message(FATAL_ERROR "Bundler: Didn't found defined config for current build type ${CMAKE_BUILD_TYPE}")
-    endif()
-
-    set(Args "${${CacheVar}.build_configurations.${CurrentConfig}.args}")
+    set(Args "${${CacheVar}.common_args}")
     _json_string_to_list("${Args}" Args)
+    if(NOT "${CurrentConfig}" STREQUAL "")
+        set(BuildArgs "${${CacheVar}.build_configurations.${CurrentConfig}.args}")
+        _json_string_to_list("${BuildArgs}" BuildArgs)
+        list(APPEND Args ${BuildArgs})
+    endif()
+    list(REMOVE_DUPLICATES Args)
     
     set(NameValuePair "")
     foreach(Arg IN LISTS Args)

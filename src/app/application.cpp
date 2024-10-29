@@ -79,7 +79,9 @@ bool Application::initialize() {
     }
 
     int windowFlags{0};
-    window = SDL_CreateWindow("Learn WebGPU", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, windowFlags);
+    window = SDL_CreateWindow(
+        "Learn WebGPU", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, windowFlags
+    );
     surface = SDL_GetWGPUSurface(instance, window);
 
     println("Requesting adapter...");
@@ -106,8 +108,14 @@ bool Application::initialize() {
         println(" - maxTextureDimension3D: {}", supportedLimits.limits.maxTextureDimension3D);
         println(" - maxTextureArrayLayers: {}", supportedLimits.limits.maxTextureArrayLayers);
         println(" - maxVertexAttributes: {}", supportedLimits.limits.maxVertexAttributes);
-        println(" - minStorageBufferOffsetAlignment: {}", supportedLimits.limits.minStorageBufferOffsetAlignment);
-        println(" - minUniformBufferOffsetAlignment: {}", supportedLimits.limits.minUniformBufferOffsetAlignment);
+        println(
+            " - minStorageBufferOffsetAlignment: {}",
+            supportedLimits.limits.minStorageBufferOffsetAlignment
+        );
+        println(
+            " - minUniformBufferOffsetAlignment: {}",
+            supportedLimits.limits.minUniformBufferOffsetAlignment
+        );
     }
 #else
     // Error in Chrome: Aborted(TODO: wgpuAdapterGetLimits unimplemented)
@@ -156,7 +164,8 @@ bool Application::initialize() {
 // A function that is invoked whenever the device stops being available.
 #if not defined(__EMSCRIPTEN__)
     DeviceLostCallbackInfo deviceLostInfo{};
-    deviceLostInfo.callback = [](WGPUDevice const *device, WGPUDeviceLostReason reason, char const *message, void *) {
+    deviceLostInfo.callback = [](WGPUDevice const *device, WGPUDeviceLostReason reason,
+                                 char const *message, void *) {
         println("Device lost: reason {}{}", reason, format_if(" ({})", message));
     };
     deviceDesc.deviceLostCallbackInfo = deviceLostInfo;
@@ -195,12 +204,15 @@ bool Application::initialize() {
 #if not defined(__EMSCRIPTEN__)
     queue.onSubmittedWorkDone2(WGPUQueueWorkDoneCallbackInfo2{
         .mode = CallbackMode::AllowProcessEvents,
-        .callback = [](WGPUQueueWorkDoneStatus status, void *userdata1, void *userdata2) {
-            println("Queued work finished with status: {} ", status);
-        }});
+        .callback =
+            [](WGPUQueueWorkDoneStatus status, void *userdata1, void *userdata2) {
+                println("Queued work finished with status: {} ", status);
+            }
+    });
 #else
-    errDoneCallbackPtr = queue.onSubmittedWorkDone(
-        [](WGPUQueueWorkDoneStatus status) { println("Queued work finished with status: {} ", status); });
+    errDoneCallbackPtr = queue.onSubmittedWorkDone([](WGPUQueueWorkDoneStatus status) {
+        println("Queued work finished with status: {} ", status);
+    });
 #endif
 
 // TODO: Workaround for getting wgpu::SurfaceGetCapabilities to work
@@ -250,7 +262,7 @@ bool Application::initialize() {
     initializeBuffers();
 
     // playingWithBuffers();
-
+    print("Hello");
     return true;
 }
 
@@ -269,8 +281,10 @@ void Application::terminate() {
     instance.release();
 }
 
-void wgpuPollEvents([[maybe_unused]] wgpu::Device device, [[maybe_unused]] bool yieldToWebBrowser,
-                    [[maybe_unused]] wgpu::Instance instance = nullptr) {
+void wgpuPollEvents(
+    [[maybe_unused]] wgpu::Device device, [[maybe_unused]] bool yieldToWebBrowser,
+    [[maybe_unused]] wgpu::Instance instance = nullptr
+) {
 #if defined(WEBGPU_BACKEND_DAWN)
     instance.processEvents();
 #elif defined(WEBGPU_BACKEND_WGPU)
@@ -369,8 +383,10 @@ wgpu::RequiredLimits Application::getRequiredLimits(wgpu::Adapter adapter) const
     // These two limits are different because they are "minimum" limits,
     // they are the only ones we are may forward from the adapter's supported
     // limits.
-    requiredLimits.limits.minUniformBufferOffsetAlignment = supportedLimits.limits.minUniformBufferOffsetAlignment;
-    requiredLimits.limits.minStorageBufferOffsetAlignment = supportedLimits.limits.minStorageBufferOffsetAlignment;
+    requiredLimits.limits.minUniformBufferOffsetAlignment =
+        supportedLimits.limits.minUniformBufferOffsetAlignment;
+    requiredLimits.limits.minStorageBufferOffsetAlignment =
+        supportedLimits.limits.minStorageBufferOffsetAlignment;
 
     // There is a maximum of 3 float forwarded from vertex to fragment shader
     requiredLimits.limits.maxInterStageShaderComponents = 3;
@@ -438,27 +454,25 @@ void Application::initializePipeline() {
                         .constants = nullptr,
 
                         .bufferCount = 1,
-                        .buffers = //
-                        (std::array{WGPUVertexBufferLayout{
-                             .arrayStride = 5 * sizeof(float),
-                             .stepMode = VertexStepMode::Vertex,
+                        .buffers = &std::array{WGPUVertexBufferLayout{
+                            .arrayStride = 5 * sizeof(float),
+                            .stepMode = VertexStepMode::Vertex,
 
-                             .attributeCount = 2,
-                             .attributes = //
-                             (std::array{
-                                  WGPUVertexAttribute{
-                                      .format = VertexFormat::Float32x2,
-                                      .offset = 0,
-                                      .shaderLocation = 0,
-                                  },
-                                  WGPUVertexAttribute{
-                                      .format = VertexFormat::Float32x3,
-                                      .offset = 2 * sizeof(float),
-                                      .shaderLocation = 1,
-                                  },
-                              })
-                                 .data(),
-                         }}).data(),
+                            .attributeCount = 2,
+                            .attributes =
+                                &std::array{
+                                    WGPUVertexAttribute{
+                                        .format = VertexFormat::Float32x2,
+                                        .offset = 0,
+                                        .shaderLocation = 0,
+                                    },
+                                    WGPUVertexAttribute{
+                                        .format = VertexFormat::Float32x3,
+                                        .offset = 2 * sizeof(float),
+                                        .shaderLocation = 1,
+                                    },
+                                }[0],
+                        }}[0],
                     },
                 .primitive =
                     WGPUPrimitiveState{
@@ -487,25 +501,24 @@ void Application::initializePipeline() {
                     // We have only one target because our render pass has only one
                     // output color attachment.
                     .targetCount = 1,
-                    .targets = //
-                    (std::array{
-                         WGPUColorTargetState{
-                             .nextInChain = nullptr,
-                             .format = surfaceFormat,
-                             .blend = addressof_rvalue(WGPUBlendState{
-                                 .color = {.operation = BlendOperation::Add,
-                                           .srcFactor = BlendFactor::SrcAlpha,
-                                           .dstFactor = BlendFactor::OneMinusSrcAlpha},
-                                 .alpha = {.operation = BlendOperation::Add,
-                                           .srcFactor = BlendFactor::Zero,
-                                           .dstFactor = BlendFactor::One},
-                             }),
-                             .writeMask = ColorWriteMask::All,
-                         },
-                     })
-                        .data(),
+                    .targets = &std::array{WGPUColorTargetState{
+                        .nextInChain = nullptr,
+                        .format = surfaceFormat,
+                        .blend = addressof_rvalue(WGPUBlendState{
+                            .color =
+                                {.operation = BlendOperation::Add,
+                                 .srcFactor = BlendFactor::SrcAlpha,
+                                 .dstFactor = BlendFactor::OneMinusSrcAlpha},
+                            .alpha =
+                                {.operation = BlendOperation::Add,
+                                 .srcFactor = BlendFactor::Zero,
+                                 .dstFactor = BlendFactor::One},
+                        }),
+                        .writeMask = ColorWriteMask::All,
+                    }}[0],
                 }),
-            });
+            }
+        );
     shaderModule.release();
 }
 
@@ -515,8 +528,6 @@ void Application::initializeBuffers() {
 
     vector<float> pointData{};
     std::vector<uint16_t> indexData{};
-
-    // ;
 
     bool success = loadGeometry(RESOURCE_DIR "/webgpu.txt", pointData, indexData);
     if (!success) {
@@ -594,6 +605,7 @@ void Application::playingWithBuffers() {
         bool ready{false};
         Buffer buffer{nullptr};
     };
+
     Context context = {false, buffer2};
 
 #if defined(WEBGPU_BACKEND_DAWN)
@@ -606,7 +618,8 @@ void Application::playingWithBuffers() {
                     return;
 
                 Buffer buffer = reinterpret_cast<WGPUBuffer>(pUserData1);
-                const uint8_t *bufferData = static_cast<const uint8_t *>(buffer.getConstMappedRange(0, 16));
+                const uint8_t *bufferData =
+                    static_cast<const uint8_t *>(buffer.getConstMappedRange(0, 16));
                 print("bufferData = [");
                 for (size_t i = 0; i < 16; ++i) {
                     if (i > 0)
@@ -636,7 +649,8 @@ void Application::playingWithBuffers() {
                 if (status != MapAsyncStatus::Success)
                     return;
 
-                const uint8_t *bufferData = static_cast<const uint8_t *>(ctx->buffer.getConstMappedRange(0, 16));
+                const uint8_t *bufferData =
+                    static_cast<const uint8_t *>(ctx->buffer.getConstMappedRange(0, 16));
                 print("bufferData = [");
                 for (size_t i = 0; i < 16; ++i) {
                     if (i > 0)
@@ -659,7 +673,8 @@ void Application::playingWithBuffers() {
         if (status != BufferMapAsyncStatus::Success)
             return;
 
-        const uint8_t *bufferData = static_cast<const uint8_t *>(ctx->buffer.getConstMappedRange(0, 16));
+        const uint8_t *bufferData =
+            static_cast<const uint8_t *>(ctx->buffer.getConstMappedRange(0, 16));
         print("bufferData = [");
         for (size_t i = 0; i < 16; ++i) {
             if (i > 0)

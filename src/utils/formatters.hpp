@@ -21,7 +21,6 @@ template <>
 struct TypeFormatter<WGPUFeatureName> {
     static std::string toString(const WGPUFeatureName &value) {
         switch (value) {
-
         case WGPUFeatureName_Undefined: return "Undefined";
         case WGPUFeatureName_DepthClipControl: return "DepthClipControl";
         case WGPUFeatureName_Depth32FloatStencil8: return "Depth32FloatStencil8";
@@ -54,7 +53,8 @@ struct TypeFormatter<WGPUFeatureName> {
         case WGPUFeatureName_PixelLocalStorageNonCoherent: return "PixelLocalStorageNonCoherent";
         case WGPUFeatureName_Unorm16TextureFormats: return "Unorm16TextureFormats";
         case WGPUFeatureName_Snorm16TextureFormats: return "Snorm16TextureFormats";
-        case WGPUFeatureName_MultiPlanarFormatExtendedUsages: return "MultiPlanarFormatExtendedUsages";
+        case WGPUFeatureName_MultiPlanarFormatExtendedUsages:
+            return "MultiPlanarFormatExtendedUsages";
         case WGPUFeatureName_MultiPlanarFormatP010: return "MultiPlanarFormatP010";
         case WGPUFeatureName_HostMappedPointer: return "HostMappedPointer";
         case WGPUFeatureName_MultiPlanarRenderTargets: return "MultiPlanarRenderTargets";
@@ -74,29 +74,39 @@ struct TypeFormatter<WGPUFeatureName> {
         case WGPUFeatureName_MultiPlanarFormatP410: return "MultiPlanarFormatP410";
         case WGPUFeatureName_SharedTextureMemoryVkDedicatedAllocation:
             return "SharedTextureMemoryVkDedicatedAllocation";
-        case WGPUFeatureName_SharedTextureMemoryAHardwareBuffer: return "SharedTextureMemoryAHardwareBuffer";
+        case WGPUFeatureName_SharedTextureMemoryAHardwareBuffer:
+            return "SharedTextureMemoryAHardwareBuffer";
         case WGPUFeatureName_SharedTextureMemoryDmaBuf: return "SharedTextureMemoryDmaBuf";
         case WGPUFeatureName_SharedTextureMemoryOpaqueFD: return "SharedTextureMemoryOpaqueFD";
-        case WGPUFeatureName_SharedTextureMemoryZirconHandle: return "SharedTextureMemoryZirconHandle";
-        case WGPUFeatureName_SharedTextureMemoryDXGISharedHandle: return "SharedTextureMemoryDXGISharedHandle";
-        case WGPUFeatureName_SharedTextureMemoryD3D11Texture2D: return "SharedTextureMemoryD3D11Texture2D";
+        case WGPUFeatureName_SharedTextureMemoryZirconHandle:
+            return "SharedTextureMemoryZirconHandle";
+        case WGPUFeatureName_SharedTextureMemoryDXGISharedHandle:
+            return "SharedTextureMemoryDXGISharedHandle";
+        case WGPUFeatureName_SharedTextureMemoryD3D11Texture2D:
+            return "SharedTextureMemoryD3D11Texture2D";
         case WGPUFeatureName_SharedTextureMemoryIOSurface: return "SharedTextureMemoryIOSurface";
         case WGPUFeatureName_SharedTextureMemoryEGLImage: return "SharedTextureMemoryEGLImage";
-        case WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD: return "SharedFenceVkSemaphoreOpaqueFD";
+        case WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD:
+            return "SharedFenceVkSemaphoreOpaqueFD";
         case WGPUFeatureName_SharedFenceVkSemaphoreSyncFD: return "SharedFenceVkSemaphoreSyncFD";
-        case WGPUFeatureName_SharedFenceVkSemaphoreZirconHandle: return "SharedFenceVkSemaphoreZirconHandle";
+        case WGPUFeatureName_SharedFenceVkSemaphoreZirconHandle:
+            return "SharedFenceVkSemaphoreZirconHandle";
         case WGPUFeatureName_SharedFenceDXGISharedHandle: return "SharedFenceDXGISharedHandle";
         case WGPUFeatureName_SharedFenceMTLSharedEvent: return "SharedFenceMTLSharedEvent";
-        case WGPUFeatureName_SharedBufferMemoryD3D12Resource: return "SharedBufferMemoryD3D12Resource";
+        case WGPUFeatureName_SharedBufferMemoryD3D12Resource:
+            return "SharedBufferMemoryD3D12Resource";
         case WGPUFeatureName_StaticSamplers: return "StaticSamplers";
         case WGPUFeatureName_YCbCrVulkanSamplers: return "YCbCrVulkanSamplers";
-        case WGPUFeatureName_ShaderModuleCompilationOptions: return "ShaderModuleCompilationOptions";
+        case WGPUFeatureName_ShaderModuleCompilationOptions:
+            return "ShaderModuleCompilationOptions";
         case WGPUFeatureName_DawnLoadResolveTexture: return "DawnLoadResolveTexture";
 #endif
 
         case WGPUFeatureName_Force32: return "Force32";
         }
-        return std::format("WGPUFeatureName: {:#010X}", static_cast<std::underlying_type_t<WGPUFeatureName>>(value));
+        return std::format(
+            "WGPUFeatureName: {:#010X}", static_cast<std::underlying_type_t<WGPUFeatureName>>(value)
+        );
     }
 };
 
@@ -110,7 +120,9 @@ struct TypeFormatter<WGPUAdapterType> {
         case WGPUAdapterType_Unknown: return "Unknown";
         case WGPUAdapterType_Force32: return "Force32";
         }
-        return std::format("WGPUAdapterType: {:#010X}", static_cast<std::underlying_type_t<WGPUAdapterType>>(value));
+        return std::format(
+            "WGPUAdapterType: {:#010X}", static_cast<std::underlying_type_t<WGPUAdapterType>>(value)
+        );
     }
 };
 
@@ -129,7 +141,9 @@ struct TypeFormatter<WGPUBackendType> {
         case WGPUBackendType_OpenGLES: return "OpenGLES";
         case WGPUBackendType_Force32: return "Force32";
         }
-        return std::format("WGPUBackendType: {:#010X}", static_cast<std::underlying_type_t<WGPUBackendType>>(value));
+        return std::format(
+            "WGPUBackendType: {:#010X}", static_cast<std::underlying_type_t<WGPUBackendType>>(value)
+        );
     }
 };
 
@@ -146,8 +160,10 @@ struct TypeFormatter<WGPUQueueWorkDoneStatus> {
         case WGPUQueueWorkDoneStatus_DeviceLost: return "DeviceLost";
         case WGPUQueueWorkDoneStatus_Force32: return "Force32";
         }
-        return std::format("WGPUQueueWorkDoneStatus: {:#010X}",
-                           static_cast<std::underlying_type_t<WGPUQueueWorkDoneStatus>>(value));
+        return std::format(
+            "WGPUQueueWorkDoneStatus: {:#010X}",
+            static_cast<std::underlying_type_t<WGPUQueueWorkDoneStatus>>(value)
+        );
     }
 };
 
@@ -269,8 +285,10 @@ struct TypeFormatter<WGPUTextureFormat> {
 #endif
         case WGPUTextureFormat_Force32: return "Force32";
         }
-        return std::format("WGPUTextureFormat: {:#010X}",
-                           static_cast<std::underlying_type_t<WGPUTextureFormat>>(value));
+        return std::format(
+            "WGPUTextureFormat: {:#010X}",
+            static_cast<std::underlying_type_t<WGPUTextureFormat>>(value)
+        );
     }
 };
 
@@ -290,8 +308,10 @@ struct TypeFormatter<WGPUBufferMapAsyncStatus> {
         case WGPUBufferMapAsyncStatus_SizeOutOfRange: return "SizeOutOfRange:";
         case WGPUBufferMapAsyncStatus_Force32: return "Force32";
         }
-        return std::format("WGPUQueueWorkDoneStatus: {:#010X}",
-                           static_cast<std::underlying_type_t<WGPUQueueWorkDoneStatus>>(value));
+        return std::format(
+            "WGPUQueueWorkDoneStatus: {:#010X}",
+            static_cast<std::underlying_type_t<WGPUQueueWorkDoneStatus>>(value)
+        );
     }
 };
 } // namespace ninelives

@@ -1,0 +1,14 @@
+IndentWidth: 4
+AccessModifierOffset: -4
+ColumnLimit: 100
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Never
+AlwaysBreakTemplateDeclarations : Yes
+SeparateDefinitionBlocks: Always
+AllowShortBlocksOnASingleLine : Empty
+Cpp11BracedListStyle: true
+AlignAfterOpenBracket: BlockIndent
+AllowShortLambdasOnASingleLine: Inline
+BreakAfterAttributes: Leave
+PenaltyReturnTypeOnItsOwnLine: 99999

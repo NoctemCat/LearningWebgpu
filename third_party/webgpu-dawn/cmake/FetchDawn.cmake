@@ -9,6 +9,11 @@ if(TRUE)
 	# message(FATAL_ERROR "err: ${BUNDLECONTENT_DEPS_DIR}/dawn-src")
 	set(Dir ${BUNDLECONTENT_DEPS_DIR}/dawn-src)
 	
+	if(WIN32)
+		set(Shell "powershell iex")
+	else()
+		set(Shell "zsh -c")
+	endif()
 	BundleContent_Declare(dawn BUNDLE_TARGET webgpu_dawn
 
 		# GIT_REPOSITORY https://dawn.googlesource.com/dawn
@@ -16,8 +21,8 @@ if(TRUE)
 		# GIT_PROGRESS TRUE
 		# GIT_SHALLOW ON
 		DOWNLOAD_COMMAND
-		bash -c
-		"git -C ${Dir} init && git -C ${Dir} fetch --depth=1 https://dawn.googlesource.com/dawn chromium/6536 && git -C ${Dir} reset --hard FETCH_HEAD"
+		# ${Shell}
+		git -C ${Dir} init && git -C ${Dir} fetch --depth=1 https://dawn.googlesource.com/dawn chromium/6536 && git -C ${Dir} reset --hard FETCH_HEAD
 		# cd ${BUNDLECONTENT_DEPS_DIR}/dawn-src &&
 		# git init &&
 		# git fetch --depth=1 https://dawn.googlesource.com/dawn chromium/6536 &&
