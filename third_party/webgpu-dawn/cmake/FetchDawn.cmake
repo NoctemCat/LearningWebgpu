@@ -1,12 +1,14 @@
 
 
-if(FALSE)
+if(TRUE)
 	if(APPLE)
 		set(ARGS_COND_APPLE -DUSE_VULKAN=OFF -DUSE_METAL=ON -DDAWN_ENABLE_METAL=ON -DDAWN_ENABLE_VULKAN=OFF)
 	else()
 		set(ARGS_COND_APPLE -DUSE_VULKAN=ON -DUSE_METAL=OFF -DDAWN_ENABLE_METAL=OFF -DDAWN_ENABLE_VULKAN=ON)
 	endif()
 	# message(FATAL_ERROR "err: ${BUNDLECONTENT_DEPS_DIR}/dawn-src")
+	set(Dir ${BUNDLECONTENT_DEPS_DIR}/dawn-src)
+	
 	BundleContent_Declare(dawn BUNDLE_TARGET webgpu_dawn
 
 		# GIT_REPOSITORY https://dawn.googlesource.com/dawn
@@ -14,10 +16,12 @@ if(FALSE)
 		# GIT_PROGRESS TRUE
 		# GIT_SHALLOW ON
 		DOWNLOAD_COMMAND
-		cd ${BUNDLECONTENT_DEPS_DIR}/dawn-src &&
-		git init &&
-		git fetch --depth=1 https://dawn.googlesource.com/dawn chromium/6536 &&
-		git reset --hard FETCH_HEAD
+		bash -c
+		"git -C ${Dir} init && git -C ${Dir} fetch --depth=1 https://dawn.googlesource.com/dawn chromium/6536 && git -C ${Dir} reset --hard FETCH_HEAD"
+		# cd ${BUNDLECONTENT_DEPS_DIR}/dawn-src &&
+		# git init &&
+		# git fetch --depth=1 https://dawn.googlesource.com/dawn chromium/6536 &&
+		# git reset --hard FETCH_HEAD
 
 		CMAKE_ARGS
 		-DDAWN_FETCH_DEPENDENCIES=ON

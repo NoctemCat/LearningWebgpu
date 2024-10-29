@@ -85,6 +85,9 @@ function(BundleContent_Declare TargetName)
     set(MultiValueArgs "")
     cmake_parse_arguments(PARSE_ARGV 1 BC_ARGS "${Options}" "${OneValueArgs}" "${MultiValueArgs}")
 
+    if(${BUNDLECONTENT_INSIDE_BUNDLECONTENT})
+        message(STATUS "Bundler: Detected that it is inside another bundler, all build steps would be forwarded to FetchContent")
+    endif()
     set(Generator "${BC_ARGS_GENERATOR}")
     set(Toolchain "${BC_ARGS_TOOLCHAIN}")
 
@@ -112,16 +115,17 @@ function(BundleContent_Declare TargetName)
         string(APPEND QuotedArgs " [===[${TargetDirectory}]===]")
 
         if(NOT "${CacheVar.forwarded_args}" STREQUAL "${QuotedArgs}")
-            message(STATUS "Bundler: Forwarding args to \"FetchContent\"")
-            message(STATUS "Bundler:${QuotedArgs}")
-            cmake_language(EVAL CODE "
-                include(FetchContent)
-                FetchContent_Declare(${TargetName} ${QuotedArgs})
-                FetchContent_GetProperties(${TargetName})
-                if(NOT ${TargetName}_POPULATED)
-                    FetchContent_Populate(${TargetName})
-                endif()
-            ")
+            if(NOT ${BUNDLECONTENT_INSIDE_BUNDLECONTENT})
+                message(STATUS "Bundler: Forwarding args to \"FetchContent\"")
+                message(STATUS "Bundler:${QuotedArgs}")
+                cmake_language(EVAL CODE "
+                    include(FetchContent)
+                    FetchContent_Declare(${TargetName} ${QuotedArgs} 
+                        SOURCE_SUBDIR this-directory-does-not-exist
+                    )
+                    FetchContent_MakeAvailable(${TargetName})
+                ")
+            endif()
 
             set(CacheVar.forwarded_args "${QuotedArgs}")
             set(CacheVar.needs_rebuild TRUE)
@@ -185,71 +189,6 @@ function(BundleContent_Declare TargetName)
 
     JC_OutputJson(ParsedCache WholeCache PRETTY)
     file(WRITE "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/bundler_cache.json" "${WholeCache}")
-endfunction()
-
-function(BundleContent_MakeAvailable)
-    set(PreviousInstalls "")
-
-    foreach(TargetName IN LISTS ARGN)
-        _make_valid_dir_name("${TargetName}" EscTargetName)
-        _BundleContent_IterateTarget("${PreviousInstalls}" "${TargetName}" ActiveConfig TargetDirectory OutputDirectory)
-
-        message(STATUS "Bundler: Finding package ${TargetName} for ${ActiveConfig}")
-
-        set(TargetDir "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/${OutputDirectory}")
-        find_package(${TargetName} REQUIRED CONFIG GLOBAL PATHS "${TargetDir}/${BUNDLECONTENT_INSTALL_DIR}/cmake/")
-
-        list(APPEND PreviousInstalls "${TargetName}|${TargetDir}/${BUNDLECONTENT_INSTALL_DIR}/cmake/")
-
-        set(${TargetName}_POPULATED TRUE PARENT_SCOPE)
-        set(${TargetName}_SOURCE_DIR "${TargetDirectory}" PARENT_SCOPE)
-        set(${TargetName}_BINARY_DIR "${TargetDir}" PARENT_SCOPE)
-    endforeach()
-endfunction()
-
-function(_BundleContent_IterateTarget PreviousInstalls TargetName OutActiveConfig OutTargetDirectory OutOutputDirectory)
-    _make_valid_dir_name("${TargetName}" EscTargetName)
-    _BundleContent_CheckStatus("${TargetName}" ActiveConfig TargetDirectory OutputDirectory ReadyToUse)
-
-    if(NOT ${ReadyToUse})
-        _BundleContent_BuildTarget("${PreviousInstalls}" "${TargetName}")
-    else()
-        message(STATUS "Bundler: ${TargetName} bundle is ready to use")
-    endif()
-
-    set(${OutActiveConfig} "${ActiveConfig}" PARENT_SCOPE)
-    set(${OutTargetDirectory} "${TargetDirectory}" PARENT_SCOPE)
-    set(${OutOutputDirectory} "${OutputDirectory}" PARENT_SCOPE)
-endfunction()
-
-function(_BundleContent_CheckStatus TargetName OutActiveConfig OutTargetDirectory OutOutputDirectory OutStatus)
-    _make_valid_dir_name("${TargetName}" EscTargetName)
-    file(READ "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/bundler_cache.json" WholeCache)
-    JC_ParseJson("${WholeCache}" ParsedCache)
-
-    set(CacheVar "ParsedCache.${ParsedCache.active_config}")
-
-    if(${${CacheVar}.needs_rebuild})
-        message(STATUS "Bundler: ${TargetName} needs rebuild. Deleting build files...")
-        set(${CacheVar}.needs_rebuild FALSE PARENT_SCOPE)
-        set(${CacheVar}.needs_rebuild FALSE)
-        set(${CacheVar}.ready_to_use FALSE PARENT_SCOPE)
-        set(${CacheVar}.ready_to_use FALSE)
-
-        foreach(Config IN LISTS ${CacheVar}.build_configurations)
-            set(${CacheVar}.build_configurations.${Config}.is_built FALSE PARENT_SCOPE)
-            set(${CacheVar}.build_configurations.${Config}.is_built FALSE)
-        endforeach()
-
-        _BundleContent_DeleteBuildFiles("${EscTargetName}" "${CacheVar}")
-        JC_OutputJson(ParsedCache WholeCache PRETTY)
-        file(WRITE "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/bundler_cache.json" "${WholeCache}")
-    endif()
-
-    set(${OutStatus} "${${CacheVar}.ready_to_use}" PARENT_SCOPE)
-    set(${OutTargetDirectory} "${${CacheVar}.target_directory}" PARENT_SCOPE)
-    set(${OutOutputDirectory} "${${CacheVar}.output_directory}" PARENT_SCOPE)
-    set(${OutActiveConfig} "${ParsedCache.active_config}" PARENT_SCOPE)
 endfunction()
 
 function(_BundleContent_SaveConfiguration BaseConfigVar ConfigName ConfigArgs)
@@ -358,6 +297,80 @@ function(_BundleContent_GenerateOutputDirectory Generator OutOutputDirectory)
 
         math(EXPR Idx "${Idx} + 1")
     endwhile()
+endfunction()
+
+macro(BundleContent_MakeAvailable)
+    if(${BUNDLECONTENT_INSIDE_BUNDLECONTENT})
+        _BundleContent_ForwardTargets(${ARGN})
+        return()
+    endif()
+    
+    set(PreviousInstalls "")
+
+    foreach(TargetName ${ARGN})
+        _make_valid_dir_name("${TargetName}" EscTargetName)
+        _BundleContent_IterateTarget("${PreviousInstalls}" "${TargetName}" ActiveConfig TargetDirectory OutputDirectory)
+
+        message(STATUS "Bundler: Finding package ${TargetName} for ${ActiveConfig}")
+
+        set(TargetDir "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/${OutputDirectory}")
+        find_package(${TargetName} REQUIRED CONFIG GLOBAL PATHS "${TargetDir}/${BUNDLECONTENT_INSTALL_DIR}/cmake/")
+
+        list(APPEND PreviousInstalls "${TargetName}|${TargetDir}/${BUNDLECONTENT_INSTALL_DIR}/cmake/")
+
+        set(${TargetName}_POPULATED TRUE)
+        set(${TargetName}_SOURCE_DIR "${TargetDirectory}")
+        set(${TargetName}_BINARY_DIR "${TargetDir}")
+
+        unset(TargetDir)
+    endforeach()
+
+    unset(PreviousInstalls)
+endmacro()
+
+function(_BundleContent_IterateTarget PreviousInstalls TargetName OutActiveConfig OutTargetDirectory OutOutputDirectory)
+    _make_valid_dir_name("${TargetName}" EscTargetName)
+    _BundleContent_CheckStatus("${TargetName}" ActiveConfig TargetDirectory OutputDirectory ReadyToUse)
+
+    if(NOT ${ReadyToUse})
+        _BundleContent_BuildTarget("${PreviousInstalls}" "${TargetName}")
+    else()
+        message(STATUS "Bundler: ${TargetName} bundle is ready to use")
+    endif()
+
+    set(${OutActiveConfig} "${ActiveConfig}" PARENT_SCOPE)
+    set(${OutTargetDirectory} "${TargetDirectory}" PARENT_SCOPE)
+    set(${OutOutputDirectory} "${OutputDirectory}" PARENT_SCOPE)
+endfunction()
+
+function(_BundleContent_CheckStatus TargetName OutActiveConfig OutTargetDirectory OutOutputDirectory OutStatus)
+    _make_valid_dir_name("${TargetName}" EscTargetName)
+    file(READ "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/bundler_cache.json" WholeCache)
+    JC_ParseJson("${WholeCache}" ParsedCache)
+
+    set(CacheVar "ParsedCache.${ParsedCache.active_config}")
+
+    if(${${CacheVar}.needs_rebuild})
+        message(STATUS "Bundler: ${TargetName} needs rebuild. Deleting build files...")
+        set(${CacheVar}.needs_rebuild FALSE PARENT_SCOPE)
+        set(${CacheVar}.needs_rebuild FALSE)
+        set(${CacheVar}.ready_to_use FALSE PARENT_SCOPE)
+        set(${CacheVar}.ready_to_use FALSE)
+
+        foreach(Config IN LISTS ${CacheVar}.build_configurations)
+            set(${CacheVar}.build_configurations.${Config}.is_built FALSE PARENT_SCOPE)
+            set(${CacheVar}.build_configurations.${Config}.is_built FALSE)
+        endforeach()
+
+        _BundleContent_DeleteBuildFiles("${EscTargetName}" "${CacheVar}")
+        JC_OutputJson(ParsedCache WholeCache PRETTY)
+        file(WRITE "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/bundler_cache.json" "${WholeCache}")
+    endif()
+
+    set(${OutStatus} "${${CacheVar}.ready_to_use}" PARENT_SCOPE)
+    set(${OutTargetDirectory} "${${CacheVar}.target_directory}" PARENT_SCOPE)
+    set(${OutOutputDirectory} "${${CacheVar}.output_directory}" PARENT_SCOPE)
+    set(${OutActiveConfig} "${ParsedCache.active_config}" PARENT_SCOPE)
 endfunction()
 
 function(_BundleContent_BuildTarget PreviousInstalls TargetName)
@@ -479,40 +492,103 @@ function(_BundleContent_GetArgs CacheVar Config OutList)
     set(${OutList} "${Args}" PARENT_SCOPE)
 endfunction()
 
-function(_delete_empty_directories_recurse DirPath)
-    set(AllFiles "${DirPath}")
-    list(POP_BACK AllFiles CurrentFile)
-    set(FoldersToAdd "")
+macro(_BundleContent_ForwardTargets Targets)
+    block(SCOPE_FOR POLICIES)
+    include(FetchContent)
 
-    while(NOT "${CurrentFile}" STREQUAL "")
-        if("${CurrentFile}" STREQUAL "|")
-            list(REMOVE_DUPLICATES FoldersToAdd)
+    cmake_policy(SET CMP0077 NEW) # make option() do nothing if already defined
+    
+    set(_BC_VariablesToUnset "")
+    set(_BC_CombineMakeAvailable "")
 
-            if(NOT "${FoldersToAdd}" STREQUAL "")
-                list(APPEND AllFiles "${FoldersToAdd}")
+    foreach(_BC_TargetName ${Targets})
+        _BundleContent_ForwardGetArgs("${_BC_TargetName}" _BC_TargetDirectory _BC_VarPair _BC_ForwardedArgs)
+    
+        list(REVERSE _BC_VarPair)
+        while(_BC_VarPair)
+            list(POP_BACK _BC_VarPair _BC_VarName _BC_VarValue)
+
+            if(DEFINED ${_BC_VarName} AND NOT DEFINED ${_BC_VarName}_BC_Restore)
+                set(${_BC_VarName}_BC_Restore "${${_BC_VarName}}")
             endif()
+            set(${_BC_VarName} "${_BC_VarValue}")
 
-            set(FoldersToAdd "")
-
-            list(POP_BACK AllFiles CurrentFile)
-            continue()
+            list(APPEND _BC_VariablesToUnset "${_BC_VarName}")
+            unset(_BC_VarName)
+            unset(_BC_VarValue)
+        endwhile()
+        
+        if("${_BC_ForwardedArgs}" STREQUAL "")
+            add_subdirectory(${_BC_TargetDirectory})
+        else()
+            cmake_language(EVAL CODE "FetchContent_Declare(${_BC_TargetName} ${_BC_ForwardedArgs})")
+            list(APPEND _BC_CombineMakeAvailable "${_BC_TargetName}")
         endif()
 
-        if(IS_DIRECTORY "${CurrentFile}")
-            # message(STATUS "Bundler: Iterating delete over ${CurrentFile}")
-            file(GLOB CurrentFiles "${CurrentFile}/*")
+        unset(_BC_TargetDirectory)
+        unset(_BC_VarPair)
+        unset(_BC_ForwardedArgs)
+    endforeach()
+    
+    if(NOT "${_BC_CombineMakeAvailable}" STREQUAL "")
+        FetchContent_MakeAvailable(${_BC_CombineMakeAvailable})
+    endif()
 
-            if("${CurrentFiles}" STREQUAL "")
-                # message(STATUS "Bundler: Deleting empty folder ${CurrentFile}")
-                file(REMOVE_RECURSE "${CurrentFile}")
-
-                cmake_path(GET CurrentFile PARENT_PATH ParentFile)
-                list(APPEND FoldersToAdd "${ParentFile}")
-            else()
-                list(APPEND AllFiles "|" "${CurrentFiles}")
-            endif()
+    foreach(_BC_UnsetName IN LISTS _BC_VariablesToUnset)
+        unset(${_BC_UnsetName})
+        if(DEFINED ${_BC_VarName}_BC_Restore)
+            set(${_BC_UnsetName} "${${_BC_VarName}_BC_Restore}")
+            unset(${_BC_VarName}_BC_Restore)
         endif()
+    endforeach()
 
-        list(POP_BACK AllFiles CurrentFile)
-    endwhile()
+    unset(_BC_CombineMakeAvailable)
+    unset(_BC_VariablesToUnset)
+    endblock()
+    # message(FATAL_ERROR "")
+endmacro()
+
+function(_BundleContent_ForwardGetArgs TargetName OutTargetDirectory OutVarPair OutForwardedArgs)
+    _make_valid_dir_name("${TargetName}" EscTargetName)
+    file(READ "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/bundler_cache.json" WholeCache)
+    JC_ParseJson("${WholeCache}" ParsedCache)
+    set(CacheVar "ParsedCache.${ParsedCache.active_config}")
+
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" ConfigUpper)
+
+    set(CurrentConfig "")
+    foreach(Config IN LISTS ParsedCache.${ParsedCache.active_config}.build_configurations)
+        string(TOUPPER "${Config}" PossibleConfigUpper)
+        if("${PossibleConfigUpper}" STREQUAL "${ConfigUpper}")
+            set(CurrentConfig "${Config}")
+            break()
+        endif()
+    endforeach()
+
+    if("${CurrentConfig}" STREQUAL "")
+        message(FATAL_ERROR "Bundler: Didn't found defined config for current build type ${CMAKE_BUILD_TYPE}")
+    endif()
+
+    set(Args "${${CacheVar}.build_configurations.${CurrentConfig}.args}")
+    _json_string_to_list("${Args}" Args)
+    
+    set(NameValuePair "")
+    foreach(Arg IN LISTS Args)
+        string(STRIP "${Arg}" Arg)
+        string(FIND "${Arg}" "-D" DefinePos)
+        
+        if(${DefinePos} EQUAL 0)
+            string(SUBSTRING "${Arg}" 2 -1 ArgNoD)
+            string(FIND "${ArgNoD}" "=" AssignPos)
+            math(EXPR PastAssignPos "${AssignPos} + 1")
+
+            string(SUBSTRING "${ArgNoD}" 0 ${AssignPos} VarName)
+            string(SUBSTRING "${ArgNoD}" ${PastAssignPos} -1 VarValue)
+            list(APPEND NameValuePair "${VarName}" "${VarValue}")
+        endif()
+    endforeach()
+    
+    set(${OutTargetDirectory} "${${CacheVar}.target_directory}" PARENT_SCOPE)
+    set(${OutVarPair} "${NameValuePair}" PARENT_SCOPE)
+    set(${OutForwardedArgs} "${${CacheVar}.forwarded_args}" PARENT_SCOPE)
 endfunction()

@@ -134,8 +134,11 @@ function(bundle_static_library_new tgt_name bundled_tgt_name OutSharedLibs OutIn
     add_library(${bundled_tgt_name} STATIC ${CMAKE_CURRENT_BINARY_DIR}/bundle_dummy.cpp)
 
     foreach(lib IN LISTS StaticLibs)
+        message(NOTICE "Colleting: ${lib}...")
         target_sources(${bundled_tgt_name} PRIVATE $<TARGET_OBJECTS:${lib}>)
     endforeach()
+
+    # message(FATAL_ERROR "err")
 
     set(${OutSharedLibs} "${SharedLibs}" PARENT_SCOPE)
     set(${OutIncludeDirs} "${LibDirectories}" PARENT_SCOPE)
@@ -175,22 +178,9 @@ function(execute_sequential)
         string(APPEND QuotedArgs " [===[${Arg}]===]")
 
         if("${Arg}" MATCHES "^OUTPUT_QUIET\$")
-            set(OutputQuiet "ON")
+            set(OutputQuiet ON)
         endif()
     endforeach()
-
-    function(_exe_seq_launch_process Cmd Args ForwardArgs Quiet)
-        if("${Cmd}" STREQUAL "")
-            return()
-        endif()
-
-        if(NOT ${Quiet})
-            string(REPLACE ";" " " AccPrint "${Args}")
-            message(STATUS "[ex_se] Executing command: ${Cmd} ${AccPrint}")
-        endif()
-
-        cmake_language(EVAL CODE "execute_process(COMMAND ${Cmd} ${Args} ${ForwardArgs})")
-    endfunction()
 
     set(Cmd "")
     set(Accumulator "")
@@ -204,12 +194,25 @@ function(execute_sequential)
             continue()
         endif()
 
-        _exe_seq_launch_process("${Cmd}" "${Accumulator}" "${QuotedArgs}" ${OutputQuiet})
+        _exe_seq_launch_process("${Cmd}" "${Accumulator}" "${QuotedArgs}" ${OutputQuiet}) 
         set(Cmd "")
         set(Accumulator "")
     endforeach()
 
     _exe_seq_launch_process("${Cmd}" "${Accumulator}" "${QuotedArgs}" ${OutputQuiet})
+endfunction()
+
+function(_exe_seq_launch_process Cmd Args ForwardArgs Quiet)
+    if("${Cmd}" STREQUAL "")
+        return()
+    endif()
+
+    if(NOT ${Quiet})
+        string(REPLACE ";" " " AccPrint "${Args}")
+        message(STATUS "[ex_se] Executing command: ${Cmd} ${AccPrint}")
+    endif()
+
+    cmake_language(EVAL CODE "execute_process(COMMAND ${Cmd} ${Args} ${ForwardArgs})")
 endfunction()
 
 function(_list_to_json_string InList OutString)
@@ -245,4 +248,42 @@ function(_make_valid_dir_name InString OutEscapedString)
     string(REGEX REPLACE "\\.$" "" InString "${InString}")
 
     set(${OutEscapedString} "${InString}" PARENT_SCOPE)
+endfunction()
+
+function(_delete_empty_directories_recurse DirPath)
+    set(AllFiles "${DirPath}")
+    list(POP_BACK AllFiles CurrentFile)
+    set(FoldersToAdd "")
+
+    while(NOT "${CurrentFile}" STREQUAL "")
+        if("${CurrentFile}" STREQUAL "|")
+            list(REMOVE_DUPLICATES FoldersToAdd)
+
+            if(NOT "${FoldersToAdd}" STREQUAL "")
+                list(APPEND AllFiles "${FoldersToAdd}")
+            endif()
+
+            set(FoldersToAdd "")
+
+            list(POP_BACK AllFiles CurrentFile)
+            continue()
+        endif()
+
+        if(IS_DIRECTORY "${CurrentFile}")
+            # message(STATUS "Bundler: Iterating delete over ${CurrentFile}")
+            file(GLOB CurrentFiles "${CurrentFile}/*")
+
+            if("${CurrentFiles}" STREQUAL "")
+                # message(STATUS "Bundler: Deleting empty folder ${CurrentFile}")
+                file(REMOVE_RECURSE "${CurrentFile}")
+
+                cmake_path(GET CurrentFile PARENT_PATH ParentFile)
+                list(APPEND FoldersToAdd "${ParentFile}")
+            else()
+                list(APPEND AllFiles "|" "${CurrentFiles}")
+            endif()
+        endif()
+
+        list(POP_BACK AllFiles CurrentFile)
+    endwhile()
 endfunction()

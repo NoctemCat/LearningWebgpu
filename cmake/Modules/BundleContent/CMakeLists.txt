@@ -236,9 +236,9 @@ foreach(Library IN LISTS SharedLibs)
     set(ImplibGenex "DEPS_${Library}_IMPLIB_$<UPPER_CASE:$<CONFIG>>")
 
     file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/Shared${Library}Library_$<LOWER_CASE:$<CONFIG>>.cmake CONTENT "
-set_and_check(${LibraryFilenameGenex} \"$<TARGET_FILE_NAME:${Library}>\")
+set(${LibraryFilenameGenex} \"$<TARGET_FILE_NAME:${Library}>\")
 set_and_check(${LibraryGenex} \"\$\{PACKAGE_PREFIX_DIR\}/${SharedDestination}/$<TARGET_FILE_NAME:${Library}>\") $<$<BOOL:${WIN32}>: 
-set_and_check(${ImplibFilenameGenex} \"${CMAKE_IMPORT_LIBRARY_PREFIX}${LibName}_$<LOWER_CASE:$<CONFIG>>${CMAKE_IMPORT_LIBRARY_SUFFIX}\") 
+set(${ImplibFilenameGenex} \"${CMAKE_IMPORT_LIBRARY_PREFIX}${LibName}_$<LOWER_CASE:$<CONFIG>>${CMAKE_IMPORT_LIBRARY_SUFFIX}\") 
 set_and_check(${ImplibGenex} \"\$\{PACKAGE_PREFIX_DIR\}/${CMAKE_INSTALL_LIBDIR}/\$\{${ImplibFilenameGenex}\}\") 
 >")
 
@@ -398,9 +398,9 @@ endif()
 string(SUBSTRING "${INSTALL_INCLUDE_DIRS}" 22 -1 INSTALL_INCLUDE_DIRS)
 
 set(TargetFileNameTemplate "$<TARGET_FILE_PREFIX:${TargetBundleName}>${TargetBundleName}_%LOWER%$<TARGET_FILE_SUFFIX:${TargetBundleName}>")
-_ReplaceWithConfig("\n" "set_and_check(${EXPORT_NAME}_LIBRARY_%LOWER% \"\$\{PACKAGE_PREFIX_DIR\}/${CMAKE_INSTALL_LIBDIR}/${TargetFileNameTemplate}\")" AllLibraries)
+_ReplaceWithConfig("\n" "set_and_check(${EXPORT_NAME}_LIBRARY_%UPPER% \"\$\{PACKAGE_PREFIX_DIR\}/${CMAKE_INSTALL_LIBDIR}/${TargetFileNameTemplate}\")" AllLibraries)
 _ReplaceWithConfig("\n    " "IMPORTED_LOCATION_%UPPER% \"\$\{${EXPORT_NAME}_LIBRARY_%UPPER%\}\"" AllLocations)
-_ReplaceWithConfig(";" "\$\{${TargetFileNameTemplate}\}" TargetNames)
+_ReplaceWithConfig(";" "\$\{${EXPORT_NAME}_LIBRARY_%UPPER%\}" TargetNames)
 
 extract_properties_genex("${TARGET_TO_BUNDLE}" TargetProps PROPERTIES
     INTERFACE_COMPILE_DEFINITIONS

@@ -69,15 +69,17 @@
                 "cache-debug"
             ],
             "name": "linux-ninja-debug",
-            "generator": "Ninja"
+            "generator": "Ninja",
+            "toolchainFile": "gcc.cmake"
         },
         {
             "inherits": [
                 "show-linux",
                 "cache-release"
             ],
-            "name": "linux-ninja-debug",
-            "generator": "Ninja"
+            "name": "linux-ninja-release",
+            "generator": "Ninja",
+            "toolchainFile": "gcc.cmake"
         },
         {
             "inherits": [

@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.13...3.24 FATAL_ERROR)
 
 project(webgpu-backend-dawn VERSION 1.0.0)
 
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/Modules")
-message(NOTICE "----- ${PROJECT_SOURCE_DIR}/cmake/Modules")
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/../../cmake/Modules")
+message(NOTICE "----- ${PROJECT_SOURCE_DIR}/../../cmake/Modules")
 include(BundleContent)
 
 message(STATUS "Using Dawn backend for WebGPU")
