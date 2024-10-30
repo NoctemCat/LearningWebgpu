@@ -7,8 +7,6 @@ option(UTILS_FILE "Feature description" "")
 option(CONFIGURATIONS "Feature description" "")
 option(PREVIOUS "Feature description" "")
 
-string(REPLACE "||" ";" PREVIOUS "${PREVIOUS}")
-string(REPLACE "," ";" CONFIGURATIONS "${CONFIGURATIONS}")
 list(TRANSFORM CONFIGURATIONS TOUPPER OUTPUT_VARIABLE ConfigsUpper)
 
 if(MSVC)
@@ -19,7 +17,7 @@ endif()
 
 project(BundleContent_RootDir VERSION 1.0.0)
 
-include(${UTILS_FILE})
+include("${UTILS_FILE}")
 
 if(NOT PROJECT_PATH)
     message(FATAL_ERROR "PROJECT_PATH is required")
@@ -46,7 +44,8 @@ if(NOT "${PREVIOUS}" STREQUAL "OFF")
     endforeach()
 endif()
 
-string(MAKE_C_IDENTIFIER "${TARGET_TO_BUNDLE}" BundleNameEscaped)
+# string(MAKE_C_IDENTIFIER "${TARGET_TO_BUNDLE}" BundleNameEscaped)
+_make_valid_dir_name("${TARGET_TO_BUNDLE}" BundleNameEscaped)
 add_subdirectory("${PROJECT_PATH}" "${CMAKE_BINARY_DIR}/${BundleNameEscaped}_bundle" EXCLUDE_FROM_ALL)
 
 if(NOT TARGET ${TARGET_TO_BUNDLE})
@@ -292,7 +291,7 @@ set_and_check(${ImplibGenex} \"\$\{PACKAGE_PREFIX_DIR\}/${CMAKE_INSTALL_LIBDIR}/
     # Have no idea if it is the same for mac, but oh well
     if(NOT WIN32)
         get_target_property(IsNoSoName ${Library} NO_SONAME)
-        if(${IsNoSoName})
+        if("${IsNoSoName}")
             set(SoNameProps "\n    IMPORTED_NO_SONAME TRUE")
         else()
             get_target_property(LibSoVersion ${Library} SOVERSION)

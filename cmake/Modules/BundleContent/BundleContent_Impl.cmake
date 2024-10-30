@@ -31,20 +31,18 @@ function(_BundleContent_BuildCacheKey Generator Toolchain OutVar)
         string(APPEND CacheKey "${BUNDLECONTENT_KEY_SEPARATOR}${ToolchainFilename}")
     endif()
 
-    string(REPLACE " " "${BUNDLECONTENT_SPACE_REPLACEMENT}" CacheKey "${CacheKey}")
+    _make_valid_dir_name("${CacheKey}" CacheKey)
     set(${OutVar} "${CacheKey}" PARENT_SCOPE)
 endfunction()
 
-function(_BundleContent_ParseArguments Args OutQuotedArgs OutBuildConfigurations)
-    set(QuotedArgs "")
+function(_BundleContent_ParseArguments BracketArgs OutForwardedArgs OutBuildConfigurations)
+    set(ForwardedArgs "")
     set(CurrentConfig "")
     set(BuildConfigurations "")
     set(AllCMakeArgs "")
 
-    while(Args)
-        list(POP_FRONT Args Arg)
-
-        if("${Arg}" MATCHES "CMAKE_ARGS_?(.*)")
+    foreach(Arg IN LISTS BracketArgs)
+        if("${Arg}" MATCHES "CMAKE_ARGS_?([^]]*)")
             if("${CMAKE_MATCH_1}" STREQUAL "")
                 set(CurrentConfig ${BUNDLECONTENT_COMMON_ARGS})
             else()
@@ -57,19 +55,19 @@ function(_BundleContent_ParseArguments Args OutQuotedArgs OutBuildConfigurations
             list(APPEND AllCMakeArgs "${Arg}")
         else()
             set(CurrentConfig "")
-            string(APPEND QuotedArgs " [===[${Arg}]===]")
+            list(APPEND ForwardedArgs "${Arg}")
         endif()
-    endwhile()
+    endforeach()
 
-    if("${AllCMakeArgs}" MATCHES "-G;|-G |-G\"")
+    if("${AllCMakeArgs}" MATCHES "\\[-G[; \"]]")
         message(FATAL_ERROR "Bundler: Please specify cmake generator with optional GENERATOR option(without \"-G\"). It will allow bundler to cache builds between different configurations")
     endif()
 
-    if("${AllCMakeArgs}" MATCHES "CMAKE_TOOLCHAIN_FILE")
+    if("${AllCMakeArgs}" MATCHES "-DCMAKE_TOOLCHAIN_FILE=")
         message(FATAL_ERROR "Bundler: Please specify cmake toolchain with optional TOOLCHAIN option. It will allow bundler to cache builds between different configurations")
     endif()
 
-    set(${OutQuotedArgs} "${QuotedArgs}" PARENT_SCOPE)
+    set(${OutForwardedArgs} "${ForwardedArgs}" PARENT_SCOPE)
     set(${OutBuildConfigurations} "${BuildConfigurations}" PARENT_SCOPE)
 
     set(IterConfigs "")
@@ -88,15 +86,21 @@ function(BundleContent_Declare TargetName)
     cmake_parse_arguments(PARSE_ARGV 1 BC_ARGS "${Options}" "${OneValueArgs}" "${MultiValueArgs}")
 
     set(PassthroughMode "${BC_ARGS_PASSTHROUGH}")
-    if(${BUNDLECONTENT_INSIDE_BUNDLECONTENT})
-        message(STATUS "Bundler: Detected being inside another bundler, enabling passthrough mode")
-        set(PassthroughMode TRUE)
-    endif()
+    # if(${BUNDLECONTENT_INSIDE_BUNDLECONTENT})
+    #     message(STATUS "Bundler: Detected being inside another bundler, enabling passthrough mode")
+    #     set(PassthroughMode TRUE)
+    # endif()
     set(Generator "${BC_ARGS_GENERATOR}")
     set(Toolchain "${BC_ARGS_TOOLCHAIN}")
 
     _BundleContent_CheckBuildComponents(Generator Toolchain)
-    _BundleContent_ParseArguments("${BC_ARGS_UNPARSED_ARGUMENTS}" QuotedArgs BuildConfigurations)
+
+    set(UnparsedBracketArgs "")
+    foreach(Arg IN LISTS BC_ARGS_UNPARSED_ARGUMENTS)
+        list(APPEND UnparsedBracketArgs "[==[${Arg}]==]")
+    endforeach()
+    
+    _BundleContent_ParseArguments("${UnparsedBracketArgs}" ForwardedArgs BuildConfigurations)
 
     _BundleContent_BuildCacheKey("${Generator}" "${Toolchain}" CacheKey)
     _BundleContent_EnsureCorrectCacheFile("${TargetName}" "${CacheKey}")
@@ -108,15 +112,15 @@ function(BundleContent_Declare TargetName)
 
     set(TargetDirectory "${BC_ARGS_SOURCE_DIR}")
 
-    if(NOT QuotedArgs AND NOT TargetDirectory)
+    if(NOT ForwardedArgs AND NOT TargetDirectory)
         message(FATAL_ERROR "Bundler: Needs SOURCE_DIR to work without download options")
     elseif(NOT TargetDirectory)
         set(TargetDirectory "${BUNDLECONTENT_DEPS_DIR}/${EscTargetName}-src")
     endif()
 
-    if(NOT "${QuotedArgs}" STREQUAL "")
-        string(APPEND QuotedArgs " [===[SOURCE_DIR]===]")
-        string(APPEND QuotedArgs " [===[${TargetDirectory}]===]")
+    if(NOT "${ForwardedArgs}" STREQUAL "")
+        list(APPEND ForwardedArgs "[==[SOURCE_DIR]==]")
+        list(APPEND ForwardedArgs "[==[${TargetDirectory}]==]")
     endif()
 
     set(ProjectTargetName "${BC_ARGS_BUNDLE_TARGET}")
@@ -156,26 +160,20 @@ function(BundleContent_Declare TargetName)
 
     foreach(ConfigString IN LISTS BuildConfigurations)
         string(TOLOWER "${ConfigString}" ConfigStringLower)
-        set(ConfigArgs ${Build_${ConfigStringLower}_Args})
-        _list_to_json_string("${ConfigArgs}" ConfigArgs)
-
-        _BundleContent_SaveConfiguration(CacheVar "${${ConfigStringLower}_MappedName}" "${ConfigArgs}")
+        _BundleContent_SaveConfiguration(CacheVar "${${ConfigStringLower}_MappedName}" "${Build_${ConfigStringLower}_Args}")
     endforeach()
-
-    set(CommonArgs ${Build_${BUNDLECONTENT_COMMON_ARGS}_Args})
-    _list_to_json_string("${CommonArgs}" CommonArgs)
     
-    _BundleContent_SetIfDifferent(CacheVar common_args "${CommonArgs}")
+    _BundleContent_SetIfDifferent(CacheVar common_args "${Build_${BUNDLECONTENT_COMMON_ARGS}_Args}")
     _BundleContent_SetIfDifferent(CacheVar target_directory "${TargetDirectory}")
     _BundleContent_SetIfDifferent(CacheVar generator "${Generator}")
     _BundleContent_SetIfDifferent(CacheVar toolchain "${Toolchain}")
     _BundleContent_SetIfDifferent(CacheVar bundle_target_name "${ProjectTargetName}")
-    _BundleContent_SetIfDifferent(CacheVar forwarded_args "${QuotedArgs}")
-    set(${CacheVar}.passthrough_mode "${PassthroughMode}")
+    _BundleContent_SetIfDifferent(CacheVar forwarded_args "${ForwardedArgs}")
+    set(CacheVar.passthrough_mode "${PassthroughMode}")
 
-    if("${CacheVar.output_directory}" STREQUAL "")
+    if("${CacheVar.output_directory_name}" STREQUAL "")
         _BundleContent_GenerateOutputDirectory("${Generator}" OutputDirectory)
-        _BundleContent_SetIfDifferent(CacheVar output_directory "${OutputDirectory}")
+        _BundleContent_SetIfDifferent(CacheVar output_directory_name "${OutputDirectory}")
     endif()
 
     JC_Assign(CacheVar ParsedCache.${CacheKey})
@@ -224,7 +222,7 @@ function(_BundleContent_EnsureCorrectCacheFile TargetName CacheKey)
     file(READ "${CacheFile}" WholeCache)
     string(JSON HasConfigString ERROR_VARIABLE HasConfigErr GET "${WholeCache}" active_config)
 
-    if("${HasConfigString}" MATCHES "-?NOTFOUND\$")
+    if(NOT "${HasConfigErr}" STREQUAL "NOTFOUND")
         message(NOTICE "Bundler: Corrupted cache found! Recreating...")
         _BundleContent_CreateEmptyCache(${EscTargetName})
         file(READ "${CacheFile}" WholeCache)
@@ -263,7 +261,7 @@ function(_BundleContent_GetDefaultCache OutVar)
         generator ""
         toolchain ""
         bundle_target_name ""
-        output_directory ""
+        output_directory_name ""
         passthrough_mode FALSE
     )
     JC_CreateObject(DefaultCache.build_configurations)
@@ -278,7 +276,7 @@ function(_BundleContent_GenerateOutputDirectory Generator OutOutputDirectory)
 
     foreach(ParsedCacheKey IN LISTS ParsedCache)
         if("${ParsedCacheKey}" MATCHES "^${GeneratorFirstPart}")
-            list(APPEND FoundOutputDirectories "${ParsedCache.${ParsedCacheKey}.output_directory}")
+            list(APPEND FoundOutputDirectories "${ParsedCache.${ParsedCacheKey}.output_directory_name}")
         endif()
     endforeach()
 
@@ -306,14 +304,15 @@ macro(BundleContent_MakeAvailable)
 
     foreach(TargetName ${ARGN})
         _make_valid_dir_name("${TargetName}" _BC_EscTargetName)
-        _BundleContent_CheckStatus("${TargetName}" _BC_PassthroughMode _BC_ActiveConfig _BC_TargetDirectory _BC_OutputDirectory _BC_ReadyToUse)
+        _BundleContent_CheckStatus("${TargetName}" _BC_PassthroughMode _BC_ActiveConfig _BC_TargetDirectory _BC_OutputDirectoryName _BC_ReadyToUse)
 
         if(NOT ${_BC_PassthroughMode})
             _BundleContent_IterateTarget(
                 "${_BC_PreviousInstalls}" 
                 "${TargetName}" 
                 "${_BC_ActiveConfig}" 
-                "${_BC_OutputDirectory}"
+                "${_BC_TargetDirectory}"
+                "${_BC_OutputDirectoryName}"
                 "${_BC_ReadyToUse}" 
             )
         else()
@@ -324,8 +323,8 @@ macro(BundleContent_MakeAvailable)
             "_BC_EscTargetName"
             "_BC_PassthroughMode" 
             "_BC_ActiveConfig" 
-            "_BC_TargetDirectory" 
-            "_BC_OutputDirectory" 
+            "_BC_TargetDirectory"
+            "_BC_OutputDirectoryName" 
             "_BC_ReadyToUse"
         )
     endforeach()
@@ -346,7 +345,7 @@ macro(BundleContent_MakeAvailable)
     endblock()
 endmacro()
 
-macro(_BundleContent_IterateTarget PreviousInstalls TargetName ActiveConfig OutputDirectory ReadyToUse)
+macro(_BundleContent_IterateTarget PreviousInstalls TargetName ActiveConfig TargetDirectory OutputDirectoryName ReadyToUse)
     _make_valid_dir_name("${TargetName}" _BC_EscTargetName)
     if(NOT ${ReadyToUse})
         _BundleContent_BuildTarget("${PreviousInstalls}" "${TargetName}")
@@ -356,18 +355,18 @@ macro(_BundleContent_IterateTarget PreviousInstalls TargetName ActiveConfig Outp
 
     message(STATUS "Bundler: Finding package ${TargetName} for ${ActiveConfig}")
 
-    set(_BC_TargetDir "${BUNDLECONTENT_BASE_DIR}/${_BC_EscTargetName}/${OutputDirectory}")
-    list(APPEND _BC_VariablesToUnset "_BC_TargetDir")
-    find_package(${TargetName} REQUIRED CONFIG GLOBAL PATHS "${_BC_TargetDir}/${BUNDLECONTENT_INSTALL_DIR}/cmake/")
+    set(_BC_TargetOutput "${BUNDLECONTENT_BASE_DIR}/${_BC_EscTargetName}/${OutputDirectoryName}")
+    list(APPEND _BC_VariablesToUnset "_BC_TargetOutput" "_BC_EscTargetName")
+    find_package(${TargetName} REQUIRED CONFIG GLOBAL PATHS "${_BC_TargetOutput}/${BUNDLECONTENT_INSTALL_DIR}/cmake/")
 
-    list(APPEND _BC_PreviousInstalls "${TargetName}|${_BC_TargetDir}/${BUNDLECONTENT_INSTALL_DIR}/cmake/")
+    list(APPEND _BC_PreviousInstalls "${TargetName}|${_BC_TargetOutput}/${BUNDLECONTENT_INSTALL_DIR}/cmake/")
 
     set(${TargetName}_POPULATED TRUE)
-    set(${TargetName}_SOURCE_DIR "${_BC_TargetDirectory}")
-    set(${TargetName}_BINARY_DIR "${_BC_TargetDir}")
+    set(${TargetName}_SOURCE_DIR "${TargetDirectory}")
+    set(${TargetName}_BINARY_DIR "${_BC_TargetOutput}")
 endmacro()
 
-function(_BundleContent_CheckStatus TargetName OutPassthroughMode OutActiveConfig OutTargetDirectory OutOutputDirectory OutReadyToUse)
+function(_BundleContent_CheckStatus TargetName OutPassthroughMode OutActiveConfig OutTargetDirectory OutOutputDirectoryName OutReadyToUse)
     _make_valid_dir_name("${TargetName}" EscTargetName)
     file(READ "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/bundler_cache.json" WholeCache)
     JC_ParseJson("${WholeCache}" ParsedCache)
@@ -377,7 +376,7 @@ function(_BundleContent_CheckStatus TargetName OutPassthroughMode OutActiveConfi
     set(${OutPassthroughMode} "${${CacheVar}.passthrough_mode}" PARENT_SCOPE)
     set(${OutActiveConfig} "${ParsedCache.active_config}" PARENT_SCOPE)
     set(${OutTargetDirectory} "${${CacheVar}.target_directory}" PARENT_SCOPE)
-    set(${OutOutputDirectory} "${${CacheVar}.output_directory}" PARENT_SCOPE)
+    set(${OutOutputDirectoryName} "${${CacheVar}.output_directory_name}" PARENT_SCOPE)
     set(${OutReadyToUse} "${${CacheVar}.ready_to_use}" PARENT_SCOPE)
 
     if(${${CacheVar}.passthrough_mode})
@@ -415,12 +414,13 @@ function(_BundleContent_BuildTarget PreviousInstalls TargetName)
 
     if(NOT "${${CacheVar}.forwarded_args}" STREQUAL "")
         message(STATUS "Bundler: Forwarding args to \"FetchContent\"")
-        message(STATUS "Bundler:${${CacheVar}.forwarded_args}")
+        string(JOIN " " ForwardedArgs ${${CacheVar}.forwarded_args})
+        message(STATUS "Bundler: ${ForwardedArgs}")
         cmake_language(EVAL CODE "
             block(SCOPE_FOR VARIABLES)
             include(FetchContent)
             FetchContent_Declare(${TargetName} 
-                ${${CacheVar}.forwarded_args} 
+                ${ForwardedArgs} 
                 SOURCE_SUBDIR this-directory-does-not-exist
             )
             FetchContent_MakeAvailable(${TargetName})
@@ -428,23 +428,23 @@ function(_BundleContent_BuildTarget PreviousInstalls TargetName)
         ")
     endif()
 
-    set(TargetDir "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/${${CacheVar}.output_directory}")
+    set(TargetDir "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/${${CacheVar}.output_directory_name}")
     set(ReleaseArgs "")
     set(AllConfigs "${${CacheVar}.build_configurations}")
-    string(REPLACE ";" "," AllConfigs "${AllConfigs}")
-    string(REPLACE ";" "||" PreviousInstalls "${PreviousInstalls}")
+    # string(REPLACE ";" "\;" AllConfigs "${AllConfigs}")
+    # string(REPLACE ";" "\;" PreviousInstalls "${PreviousInstalls}")
 
     foreach(Config IN LISTS ${CacheVar}.build_configurations)
         string(TOLOWER "${Config}" ConfigLower)
         _BundleContent_GetArgs("${CacheVar}" "${Config}" Args)
 
         list(APPEND Args
-            "-DEXPORT_NAME=${TargetName}"
-            "-DCONFIGURATIONS=${AllConfigs}"
+            "[===[-DEXPORT_NAME=${TargetName}]===]"
+            "[===[-DCONFIGURATIONS=${AllConfigs}]===]"
         )
 
         if(NOT "${PreviousInstalls}" STREQUAL "")
-            list(APPEND Args "-DPREVIOUS=${PreviousInstalls}")
+            list(APPEND Args "[===[-DPREVIOUS=${PreviousInstalls}]===]")
         endif()
 
         if("${ConfigLower}" STREQUAL "release")
@@ -488,7 +488,7 @@ function(_BundleContent_BuildTarget PreviousInstalls TargetName)
 endfunction()
 
 function(_BundleContent_DeleteBuildFiles EscTargetName CacheVar)
-    set(TargetDir "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/${${CacheVar}.output_directory}")
+    set(TargetDir "${BUNDLECONTENT_BASE_DIR}/${EscTargetName}/${${CacheVar}.output_directory_name}")
 
     if(NOT EXISTS ${TargetDir})
         return()
@@ -517,11 +517,8 @@ function(_BundleContent_DeleteBuildFiles EscTargetName CacheVar)
 endfunction()
 
 function(_BundleContent_GetArgs CacheVar Config OutList)
-    set(Args "${${CacheVar}.common_args}")
-    set(BuildArgs "${${CacheVar}.build_configurations.${Config}.args}")
-    _json_string_to_list("${Args}" Args)
-    _json_string_to_list("${BuildArgs}" BuildArgs)
-    list(APPEND Args ${BuildArgs})
+    set(Args ${${CacheVar}.common_args})
+    list(APPEND Args ${${CacheVar}.build_configurations.${Config}.args})
     list(REMOVE_DUPLICATES Args)
 
     if(NOT "${Args}" MATCHES "CMAKE_BUILD_TYPE")
@@ -529,14 +526,14 @@ function(_BundleContent_GetArgs CacheVar Config OutList)
     endif()
 
     list(APPEND Args
-        "-DPROJECT_PATH=${${CacheVar}.target_directory}"
-        "-DTARGET_TO_BUNDLE=${${CacheVar}.bundle_target_name}"
-        "-DUTILS_FILE=${BUNDLECONTENT_MODULE_DIR}/BundleContent/BundleContent_Utils.cmake"
-        "-G" "${${CacheVar}.generator}"
+        "[===[-DPROJECT_PATH=${${CacheVar}.target_directory}]===]"
+        "[===[-DTARGET_TO_BUNDLE=${${CacheVar}.bundle_target_name}]===]"
+        "[===[-DUTILS_FILE=${BUNDLECONTENT_MODULE_DIR}/BundleContent/BundleContent_Utils.cmake]===]"
+        "-G" "[===[${${CacheVar}.generator}]===]"
     )
 
     if(NOT "${${CacheVar}.toolchain}" STREQUAL "")
-        list(APPEND Args "--toolchain" "${${CacheVar}.toolchain}")
+        list(APPEND Args "--toolchain" "[===[${${CacheVar}.toolchain}]===]")
     endif()
 
     set(${OutList} "${Args}" PARENT_SCOPE)
@@ -546,23 +543,31 @@ macro(_BundleContent_IterateTargetPassthrough TargetName)
     _BundleContent_ForwardGetArgs("${TargetName}" _BC_TargetDirectory _BC_VarPair _BC_ForwardedArgs)
     list(APPEND _BC_VariablesToUnset "_BC_TargetDirectory" "_BC_VarPair" "_BC_ForwardedArgs")
 
-    list(REVERSE _BC_VarPair)
-    while(_BC_VarPair)
-        list(POP_BACK _BC_VarPair _BC_VarName _BC_VarValue)
+    block(SCOPE_FOR VARIABLES)
+    foreach(KeyValuePair IN LISTS _BC_VarPair)
 
-        if(DEFINED ${_BC_VarName} AND NOT DEFINED ${_BC_VarName}_BC_Restore)
-            set(${_BC_VarName}_BC_Restore "${${_BC_VarName}}")
+        if("${KeyValuePair}" MATCHES [==[^\[?=*\[?-D([^=]+)=([^]]*)\]?=*\]?$]==])
+            set(VarName "${CMAKE_MATCH_1}")
+            set(VarValue "${CMAKE_MATCH_2}")
+            if(DEFINED ${VarName} AND NOT DEFINED ${VarName}_BC_Restore)
+                set(${VarName}_BC_Restore "${${VarName}}" PARENT_SCOPE)
+                set(${VarName}_BC_Restore "${${VarName}}")
+            endif()
+            set(${VarName} "${VarValue}" PARENT_SCOPE)
+    
+            list(APPEND _BC_VariablesToUnset "${VarName}")
         endif()
-        set(${_BC_VarName} "${_BC_VarValue}")
+    endforeach()
 
-        list(APPEND _BC_VariablesToUnset "${_BC_VarName}" "_BC_VarName" "_BC_VarValue")
-    endwhile()
+    set(_BC_VariablesToUnset "${_BC_VariablesToUnset}" PARENT_SCOPE)
+    endblock()
     
     if("${_BC_ForwardedArgs}" STREQUAL "")
         add_subdirectory(${_BC_TargetDirectory})
     else()
-        cmake_language(EVAL CODE "FetchContent_Declare(${_BC_TargetName} ${_BC_ForwardedArgs})")
-        list(APPEND _BC_CombineMakeAvailable "${_BC_TargetName}")
+        string(JOIN " " _BC_ForwardedArgs ${_BC_ForwardedArgs})
+        cmake_language(EVAL CODE "FetchContent_Declare(${TargetName} ${_BC_ForwardedArgs})")
+        list(APPEND _BC_CombineMakeAvailable "${TargetName}")
     endif()
 endmacro()
 
@@ -583,32 +588,13 @@ function(_BundleContent_ForwardGetArgs TargetName OutTargetDirectory OutVarPair 
         endif()
     endforeach()
 
-    set(Args "${${CacheVar}.common_args}")
-    _json_string_to_list("${Args}" Args)
+    set(Args ${${CacheVar}.common_args})
     if(NOT "${CurrentConfig}" STREQUAL "")
-        set(BuildArgs "${${CacheVar}.build_configurations.${CurrentConfig}.args}")
-        _json_string_to_list("${BuildArgs}" BuildArgs)
-        list(APPEND Args ${BuildArgs})
+        list(APPEND Args ${${CacheVar}.build_configurations.${CurrentConfig}.args})
     endif()
     list(REMOVE_DUPLICATES Args)
     
-    set(NameValuePair "")
-    foreach(Arg IN LISTS Args)
-        string(STRIP "${Arg}" Arg)
-        string(FIND "${Arg}" "-D" DefinePos)
-        
-        if(${DefinePos} EQUAL 0)
-            string(SUBSTRING "${Arg}" 2 -1 ArgNoD)
-            string(FIND "${ArgNoD}" "=" AssignPos)
-            math(EXPR PastAssignPos "${AssignPos} + 1")
-
-            string(SUBSTRING "${ArgNoD}" 0 ${AssignPos} VarName)
-            string(SUBSTRING "${ArgNoD}" ${PastAssignPos} -1 VarValue)
-            list(APPEND NameValuePair "${VarName}" "${VarValue}")
-        endif()
-    endforeach()
-    
     set(${OutTargetDirectory} "${${CacheVar}.target_directory}" PARENT_SCOPE)
-    set(${OutVarPair} "${NameValuePair}" PARENT_SCOPE)
+    set(${OutVarPair} "${Args}" PARENT_SCOPE)
     set(${OutForwardedArgs} "${${CacheVar}.forwarded_args}" PARENT_SCOPE)
 endfunction()
